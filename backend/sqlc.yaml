@@ -1,12 +1,12 @@
 version: "2"
 sql:
   - engine: "postgresql"
-    schema: "services/auth-service/internal/infrastructure/postgres/sqlc/schema.sql"
-    queries: "services/auth-service/internal/infrastructure/postgres/sqlc/queries"
+    schema: "shared/sqlc/schemas/*.sql"
+    queries: "shared/sqlc/queries/*.sql"
     gen:
       go:
         package: "db"
-        out: "services/auth-service/internal/infrastructure/postgres/sqlc/generated"
+        out: "shared/sqlc/generated"
         sql_package: "pgx/v5"
         emit_pointers_for_null_types: true
         emit_interface: false

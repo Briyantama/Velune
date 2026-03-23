@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/moon-eye/velune/services/auth-service/internal/domain"
 	"github.com/moon-eye/velune/services/auth-service/internal/repository"
-	db "github.com/moon-eye/velune/services/auth-service/internal/infrastructure/postgres/sqlc/generated"
+	"github.com/moon-eye/velune/shared/sqlc/generated"
 )
 
 type UserRepo struct {

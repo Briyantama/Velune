@@ -12,7 +12,7 @@ import (
 	"github.com/moon-eye/velune/services/auth-service/internal/domain"
 	"github.com/moon-eye/velune/services/auth-service/internal/repository"
 	errs "github.com/moon-eye/velune/shared/errors"
-	sqlc "github.com/moon-eye/velune/services/auth-service/internal/infrastructure/postgres/sqlc/generated"
+	"github.com/moon-eye/velune/shared/sqlc/generated"
 )
 
 type RefreshTokenRepo struct {
@@ -24,7 +24,7 @@ func NewRefreshTokenRepo(s *Store) repository.RefreshTokenRepository {
 }
 
 func (r *RefreshTokenRepo) Store(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) error {
-	return r.s.Queries.StoreRefreshToken(ctx, sqlc.StoreRefreshTokenParams{
+	return r.s.Queries.StoreRefreshToken(ctx, db.StoreRefreshTokenParams{
 		ID: pgtype.UUID{
 			Bytes: uuid.New(),
 			Valid: true,
@@ -69,7 +69,7 @@ func (r *RefreshTokenRepo) GetByTokenHash(ctx context.Context, tokenHash string)
 }
 
 func (r *RefreshTokenRepo) Rotate(ctx context.Context, tokenID uuid.UUID, newTokenHash string, newExpiresAt time.Time) error {
-	rows, err := r.s.Queries.RotateRefreshToken(ctx, sqlc.RotateRefreshTokenParams{
+	rows, err := r.s.Queries.RotateRefreshToken(ctx, db.RotateRefreshTokenParams{
 		TokenHash: newTokenHash,
 		ExpiresAt: pgtype.Timestamptz{
 			Time:  newExpiresAt.UTC(),
