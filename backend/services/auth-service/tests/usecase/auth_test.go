@@ -14,6 +14,7 @@ import (
 	"github.com/moon-eye/velune/services/auth-service/internal/repository"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/jwt"
+	"github.com/moon-eye/velune/services/auth-service/internal/usecase"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -137,7 +138,7 @@ func TestRegister_Success(t *testing.T) {
 		},
 	}
 
-	svc := &AuthService{
+	svc := &usecase.AuthService{
 		Users:         userRepo,
 		RefreshTokens: refreshRepo,
 		JWTSecret:     jwtSecret,
@@ -145,7 +146,7 @@ func TestRegister_Success(t *testing.T) {
 		RefreshTTL:    refreshTTL,
 	}
 
-	resp, err := svc.Register(ctx, RegisterInput{
+	resp, err := svc.Register(ctx, usecase.RegisterInput{
 		Email:        "User@Example.com",
 		Password:     "password123",
 		BaseCurrency: "usd",
@@ -212,7 +213,7 @@ func TestLogin_Success(t *testing.T) {
 		},
 	}
 
-	svc := &AuthService{
+	svc := &usecase.AuthService{
 		Users:         userRepo,
 		RefreshTokens: refreshRepo,
 		JWTSecret:     jwtSecret,
@@ -220,7 +221,7 @@ func TestLogin_Success(t *testing.T) {
 		RefreshTTL:    refreshTTL,
 	}
 
-	resp, err := svc.Login(ctx, LoginInput{
+	resp, err := svc.Login(ctx, usecase.LoginInput{
 		Email:    "User@Example.com",
 		Password: password,
 	})
@@ -271,7 +272,7 @@ func TestLogin_InvalidPassword_ReturnsStableCode(t *testing.T) {
 
 	refreshRepo := &mockRefreshRepo{}
 
-	svc := &AuthService{
+	svc := &usecase.AuthService{
 		Users:         userRepo,
 		RefreshTokens: refreshRepo,
 		JWTSecret:     jwtSecret,
@@ -279,7 +280,7 @@ func TestLogin_InvalidPassword_ReturnsStableCode(t *testing.T) {
 		RefreshTTL:    refreshTTL,
 	}
 
-	_, err = svc.Login(ctx, LoginInput{
+	_, err = svc.Login(ctx, usecase.LoginInput{
 		Email:    "user@example.com",
 		Password: "wrong-password",
 	})
@@ -353,7 +354,7 @@ func TestRefresh_RotatesAndReturnsNewTokens(t *testing.T) {
 		},
 	}
 
-	svc := &AuthService{
+	svc := &usecase.AuthService{
 		Users:         userRepo,
 		RefreshTokens: refreshRepo,
 		JWTSecret:     jwtSecret,
@@ -361,7 +362,7 @@ func TestRefresh_RotatesAndReturnsNewTokens(t *testing.T) {
 		RefreshTTL:    refreshTTL,
 	}
 
-	resp, err := svc.Refresh(ctx, RefreshInput{RefreshToken: oldRefreshToken})
+	resp, err := svc.Refresh(ctx, usecase.RefreshInput{RefreshToken: oldRefreshToken})
 	if err != nil {
 		t.Fatalf("expected success, got error: %v", err)
 	}
@@ -387,7 +388,7 @@ func TestRefresh_RotatesAndReturnsNewTokens(t *testing.T) {
 
 func TestRefresh_InvalidToken_ReturnsStableCode(t *testing.T) {
 	ctx := context.Background()
-	svc := &AuthService{
+	svc := &usecase.AuthService{
 		JWTSecret:   "test-secret",
 		AccessTTL:   1 * time.Hour,
 		RefreshTTL: 30 * 24 * time.Hour,
@@ -399,7 +400,7 @@ func TestRefresh_InvalidToken_ReturnsStableCode(t *testing.T) {
 		},
 	}
 
-	_, err := svc.Refresh(ctx, RefreshInput{RefreshToken: "unknown"})
+	_, err := svc.Refresh(ctx, usecase.RefreshInput{RefreshToken: "unknown"})
 	if err == nil {
 		t.Fatalf("expected error")
 	}
