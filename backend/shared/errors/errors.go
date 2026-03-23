@@ -23,9 +23,10 @@ func New(code, message string, status int) *AppError {
 var (
 	ErrUnauthorized = New("UNAUTHORIZED", "unauthorized", http.StatusUnauthorized)
 	ErrForbidden    = New("FORBIDDEN", "forbidden", http.StatusForbidden)
-	ErrNotFound     = New("NOT_FOUND", "resource not found", http.StatusNotFound)
+	ErrNotFound     = New("NOT_FOUND", "not found", http.StatusNotFound)
 	ErrValidation   = New("VALIDATION_ERROR", "validation failed", http.StatusBadRequest)
-	ErrConflict     = New("CONFLICT", "resource conflict", http.StatusConflict)
+	ErrConflict     = New("CONFLICT", "conflict", http.StatusConflict)
+	ErrRefreshToken = New("REFRESH_TOKEN_ERROR", "refresh token error", http.StatusUnauthorized)
 	ErrInsufficient = New("BALANCE_ERROR", "insufficient balance", http.StatusUnprocessableEntity)
 	ErrInternal     = New("INTERNAL_ERROR", "internal server error", http.StatusInternalServerError)
 )

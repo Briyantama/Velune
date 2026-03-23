@@ -148,7 +148,7 @@ func (s *AuthService) Refresh(ctx context.Context, in RefreshInput) (*TokenRespo
 	newHash := hashToken(newRefresh)
 	newExpires := time.Now().UTC().Add(s.refreshTTL())
 	if err := s.RefreshTokens.Rotate(ctx, existing.ID, newHash, newExpires); err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
+		if errors.Is(err, errs.ErrRefreshToken) {
 			return nil, errs.New("AUTH_INVALID_REFRESH_TOKEN", "invalid refresh token", http.StatusUnauthorized)
 		}
 		return nil, err

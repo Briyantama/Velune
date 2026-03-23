@@ -2,14 +2,17 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/moon-eye/velune/services/auth-service/internal/domain"
 	"github.com/moon-eye/velune/services/auth-service/internal/repository"
+	db "github.com/moon-eye/velune/services/auth-service/internal/infrastructure/postgres/sqlc/generated"
 )
 
 type UserRepo struct {
@@ -21,56 +24,79 @@ func NewUserRepo(s *Store) repository.UserRepository {
 }
 
 func (r *UserRepo) Create(ctx context.Context, u *domain.User) error {
-	const q = `
-INSERT INTO users (id, email, password_hash, base_currency, version, created_at, updated_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7)`
-	_, err := r.s.Pool.Exec(ctx, q,
-		u.ID,
-		strings.ToLower(u.Email),
-		u.PasswordHash,
-		strings.ToUpper(u.BaseCurrency),
-		u.Version,
-		u.CreatedAt,
-		u.UpdatedAt,
-	)
-	return err
+	return r.s.Queries.CreateUser(ctx, db.CreateUserParams{
+		ID: pgtype.UUID{
+			Bytes: u.ID,
+			Valid: true,
+		},
+		Email:        strings.ToLower(u.Email),
+		PasswordHash: u.PasswordHash,
+		BaseCurrency: strings.ToUpper(u.BaseCurrency),
+		Version:      u.Version,
+		CreatedAt: pgtype.Timestamptz{
+			Time:  u.CreatedAt,
+			Valid: true,
+		},
+		UpdatedAt: pgtype.Timestamptz{
+			Time:  u.UpdatedAt,
+			Valid: true,
+		},
+	})
 }
 
 func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
-	const q = `
-SELECT id, email, password_hash, base_currency, version, created_at, updated_at, deleted_at
-FROM users
-WHERE id = $1 AND deleted_at IS NULL`
-	row := r.s.Pool.QueryRow(ctx, q, id)
-	return scanUser(row)
+	u, err := r.s.Queries.GetUserByID(ctx, pgtype.UUID{
+		Bytes: id,
+		Valid: true,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var deletedAt *time.Time
+	if u.DeletedAt.Valid {
+		t := u.DeletedAt.Time
+		deletedAt = &t
+	}
+
+	return &domain.User{
+		ID:           uuid.UUID(u.ID.Bytes),
+		Email:        u.Email,
+		PasswordHash: u.PasswordHash,
+		BaseCurrency: u.BaseCurrency,
+		Version:      u.Version,
+		CreatedAt:    u.CreatedAt.Time,
+		UpdatedAt:    u.UpdatedAt.Time,
+		DeletedAt:    deletedAt,
+	}, nil
 }
 
 func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	const q = `
-SELECT id, email, password_hash, base_currency, version, created_at, updated_at, deleted_at
-FROM users
-WHERE lower(email) = lower($1) AND deleted_at IS NULL`
-	row := r.s.Pool.QueryRow(ctx, q, email)
-	return scanUser(row)
-}
-
-func scanUser(row pgx.Row) (*domain.User, error) {
-	var u domain.User
-	err := row.Scan(
-		&u.ID,
-		&u.Email,
-		&u.PasswordHash,
-		&u.BaseCurrency,
-		&u.Version,
-		&u.CreatedAt,
-		&u.UpdatedAt,
-		&u.DeletedAt,
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
+	u, err := r.s.Queries.GetUserByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
 	}
-	return &u, err
-}
 
-// Ensure time imports are used when the compiler runs.
-var _ = time.Time{}
+	var deletedAt *time.Time
+	if u.DeletedAt.Valid {
+		t := u.DeletedAt.Time
+		deletedAt = &t
+	}
+
+	return &domain.User{
+		ID:           uuid.UUID(u.ID.Bytes),
+		Email:        u.Email,
+		PasswordHash: u.PasswordHash,
+		BaseCurrency: u.BaseCurrency,
+		Version:      u.Version,
+		CreatedAt:    u.CreatedAt.Time,
+		UpdatedAt:    u.UpdatedAt.Time,
+		DeletedAt:    deletedAt,
+	}, nil
+}

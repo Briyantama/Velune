@@ -2,13 +2,17 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/moon-eye/velune/services/auth-service/internal/domain"
 	"github.com/moon-eye/velune/services/auth-service/internal/repository"
+	errs "github.com/moon-eye/velune/shared/errors"
+	sqlc "github.com/moon-eye/velune/services/auth-service/internal/infrastructure/postgres/sqlc/generated"
 )
 
 type RefreshTokenRepo struct {
@@ -20,70 +24,81 @@ func NewRefreshTokenRepo(s *Store) repository.RefreshTokenRepository {
 }
 
 func (r *RefreshTokenRepo) Store(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) error {
-	const q = `
-INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, version, created_at, updated_at)
-VALUES ($1,$2,$3,$4,1,now(),now())`
-	_, err := r.s.Pool.Exec(ctx, q, uuid.New(), userID, tokenHash, expiresAt.UTC())
-	return err
+	return r.s.Queries.StoreRefreshToken(ctx, sqlc.StoreRefreshTokenParams{
+		ID: pgtype.UUID{
+			Bytes: uuid.New(),
+			Valid: true,
+		},
+		UserID: pgtype.UUID{
+			Bytes: userID,
+			Valid: true,
+		},
+		TokenHash: tokenHash,
+		ExpiresAt: pgtype.Timestamptz{
+			Time:  expiresAt.UTC(),
+			Valid: true,
+		},
+	})
 }
 
 func (r *RefreshTokenRepo) GetByTokenHash(ctx context.Context, tokenHash string) (*domain.RefreshToken, error) {
-	const q = `
-SELECT id, user_id, token_hash, expires_at, version, created_at, updated_at, deleted_at
-FROM refresh_tokens
-WHERE token_hash = $1 AND deleted_at IS NULL AND expires_at > now()`
-	row := r.s.Pool.QueryRow(ctx, q, tokenHash)
-	var rr domain.RefreshToken
-	err := row.Scan(
-		&rr.ID,
-		&rr.UserID,
-		&rr.TokenHash,
-		&rr.ExpiresAt,
-		&rr.Version,
-		&rr.CreatedAt,
-		&rr.UpdatedAt,
-		&rr.DeletedAt,
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
+	rr, err := r.s.Queries.GetRefreshTokenByTokenHash(ctx, tokenHash)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
-	return &rr, nil
+
+	var deletedAt *time.Time
+	if rr.DeletedAt.Valid {
+		t := rr.DeletedAt.Time
+		deletedAt = &t
+	}
+
+	return &domain.RefreshToken{
+		ID:         uuid.UUID(rr.ID.Bytes),
+		UserID:     uuid.UUID(rr.UserID.Bytes),
+		TokenHash:  rr.TokenHash,
+		ExpiresAt:  rr.ExpiresAt.Time,
+		Version:    rr.Version,
+		CreatedAt:  rr.CreatedAt.Time,
+		UpdatedAt:  rr.UpdatedAt.Time,
+		DeletedAt:  deletedAt,
+	}, nil
 }
 
 func (r *RefreshTokenRepo) Rotate(ctx context.Context, tokenID uuid.UUID, newTokenHash string, newExpiresAt time.Time) error {
-	const q = `
-UPDATE refresh_tokens
-SET token_hash = $1,
-    expires_at = $2,
-    version = version + 1,
-    updated_at = now()
-WHERE id = $3 AND deleted_at IS NULL`
-	tag, err := r.s.Pool.Exec(ctx, q, newTokenHash, newExpiresAt.UTC(), tokenID)
+	rows, err := r.s.Queries.RotateRefreshToken(ctx, sqlc.RotateRefreshTokenParams{
+		TokenHash: newTokenHash,
+		ExpiresAt: pgtype.Timestamptz{
+			Time:  newExpiresAt.UTC(),
+			Valid: true,
+		},
+		ID: pgtype.UUID{
+			Bytes: tokenID,
+			Valid: true,
+		},
+	})
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
-		return repository.ErrNotFound
+	if rows == 0 {
+		return errs.ErrRefreshToken
 	}
 	return nil
 }
 
 func (r *RefreshTokenRepo) SoftDelete(ctx context.Context, tokenID uuid.UUID) error {
-	const q = `
-UPDATE refresh_tokens
-SET deleted_at = now(),
-    version = version + 1,
-    updated_at = now()
-WHERE id = $1 AND deleted_at IS NULL`
-	tag, err := r.s.Pool.Exec(ctx, q, tokenID)
+	rows, err := r.s.Queries.SoftDeleteRefreshToken(ctx, pgtype.UUID{
+		Bytes: tokenID,
+		Valid: true,
+	})
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
-		return repository.ErrNotFound
+	if rows == 0 {
+		return errs.ErrRefreshToken
 	}
 	return nil
 }
