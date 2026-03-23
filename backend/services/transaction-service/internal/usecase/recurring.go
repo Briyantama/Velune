@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +11,7 @@ import (
 	"github.com/moon-eye/velune/services/transaction-service/internal/repository"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/pagination"
+	"github.com/moon-eye/velune/shared/stringx"
 )
 
 type RecurringService struct {
@@ -55,12 +55,12 @@ func (s *RecurringService) Create(ctx context.Context, userID uuid.UUID, in Crea
 		AccountID:   in.AccountID,
 		CategoryID:  in.CategoryID,
 		AmountMinor: in.AmountMinor,
-		Currency:    strings.ToUpper(in.Currency),
+		Currency:    stringx.Upper(in.Currency),
 		Type:        domain.TransactionType(in.Type),
 		Frequency:   domain.RecurringFrequency(in.Frequency),
 		NextRunAt:   in.NextRunAt.UTC(),
 		IsActive:    true,
-		Description: strings.TrimSpace(in.Description),
+		Description: stringx.TrimSpace(in.Description),
 		Version:     1,
 		CreatedAt:   now,
 		UpdatedAt:   now,

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/transaction-service/internal/usecase"
+	"github.com/moon-eye/velune/shared/contracts"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/httpx"
 )
@@ -217,13 +218,13 @@ func (s *Server) transactionsSummary(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"from":        from,
-		"to":          to,
-		"currency":    cur,
-		"incomeMinor": inc,
-		"expenseMinor": exp,
-		"netMinor":    inc - exp,
+	httpx.WriteJSON(w, http.StatusOK, contracts.TransactionSummary{
+		From:         *from,
+		To:           *to,
+		Currency:     cur,
+		IncomeMinor:  inc,
+		ExpenseMinor: exp,
+		NetMinor:     inc - exp,
 	})
 }
 
@@ -249,10 +250,18 @@ func (s *Server) transactionsSummaryByCategory(w http.ResponseWriter, r *http.Re
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"from":      from,
-		"to":        to,
-		"currency":  cur,
-		"totals":    m,
+	breakdown := make([]contracts.TransactionCategorySummary, 0, len(m))
+	for cid, total := range m {
+		cidCopy := cid
+		breakdown = append(breakdown, contracts.TransactionCategorySummary{
+			CategoryID: &cidCopy,
+			TotalMinor: total,
+		})
+	}
+	httpx.WriteJSON(w, http.StatusOK, contracts.TransactionCategoryTotalsResponse{
+		From:      *from,
+		To:        *to,
+		Currency:  cur,
+		Breakdown: breakdown,
 	})
 }

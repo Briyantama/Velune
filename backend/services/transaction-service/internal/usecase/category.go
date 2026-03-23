@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +11,7 @@ import (
 	"github.com/moon-eye/velune/services/transaction-service/internal/repository"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/pagination"
+	"github.com/moon-eye/velune/shared/stringx"
 )
 
 type CategoryService struct {
@@ -37,7 +37,7 @@ func (s *CategoryService) Create(ctx context.Context, userID uuid.UUID, in Creat
 	c := &domain.Category{
 		ID:        uuid.New(),
 		UserID:    userID,
-		Name:      strings.TrimSpace(in.Name),
+		Name:      stringx.TrimSpace(in.Name),
 		ParentID:  in.ParentID,
 		Version:   1,
 		CreatedAt: now,
@@ -71,7 +71,7 @@ func (s *CategoryService) Update(ctx context.Context, userID, id uuid.UUID, vers
 		return nil, errs.New("VALIDATION_ERROR", "category cannot be its own parent", http.StatusBadRequest)
 	}
 	now := time.Now().UTC()
-	c.Name = strings.TrimSpace(in.Name)
+	c.Name = stringx.TrimSpace(in.Name)
 	c.ParentID = in.ParentID
 	c.Version = version + 1
 	c.UpdatedAt = now

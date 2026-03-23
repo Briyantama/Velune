@@ -2,9 +2,9 @@ package config
 
 import (
 	"os"
-	"strings"
 	"time"
 
+	"github.com/moon-eye/velune/shared/stringx"
 	"github.com/spf13/viper"
 )
 
@@ -28,7 +28,7 @@ type Service struct {
 }
 
 func Load(serviceName string) (*Service, error) {
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.SetEnvKeyReplacer(stringx.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 	viper.SetDefault("HTTP_PORT", "8080")
 	viper.SetDefault("HTTP_HOST", "0.0.0.0")

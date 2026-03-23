@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +11,7 @@ import (
 	"github.com/moon-eye/velune/services/transaction-service/internal/repository"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/pagination"
+	"github.com/moon-eye/velune/shared/stringx"
 )
 
 type AccountService struct {
@@ -29,9 +29,9 @@ func (s *AccountService) Create(ctx context.Context, userID uuid.UUID, in Create
 	a := &domain.Account{
 		ID:           uuid.New(),
 		UserID:       userID,
-		Name:         strings.TrimSpace(in.Name),
+		Name:         stringx.TrimSpace(in.Name),
 		Type:         domain.AccountType(in.Type),
-		Currency:     strings.ToUpper(in.Currency),
+		Currency:     stringx.Upper(in.Currency),
 		BalanceMinor: 0,
 		Version:      1,
 		CreatedAt:    now,
@@ -73,7 +73,7 @@ func (s *AccountService) Update(ctx context.Context, userID uuid.UUID, id uuid.U
 		return nil, errs.ErrNotFound
 	}
 	now := time.Now().UTC()
-	a.Name = strings.TrimSpace(in.Name)
+	a.Name = stringx.TrimSpace(in.Name)
 	a.Type = domain.AccountType(in.Type)
 	a.Version = version + 1
 	a.UpdatedAt = now

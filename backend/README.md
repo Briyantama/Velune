@@ -12,7 +12,7 @@ Multi-service **Expense Tracker / Money Manager** backend: independent deployabl
 | `services/transaction-service` | Ledger source of truth: accounts, categories, transactions, recurring, summaries ([docs](services/transaction-service/README.md)) |
 | `services/category-service` | Categories (legacy scaffold; `/api/v1/categories` now routed to transaction-service) |
 | `services/budget-service` | Budgets + budget usage/overspend via transaction contracts ([docs](services/budget-service/README.md)) |
-| `services/report-service` | Aggregations; calls peers via HTTP only (scaffold) |
+| `services/report-service` | Read-only analytics service for `/api/v1/reports/*`; consumes transaction contracts ([docs](services/report-service/README.md)) |
 | `services/notification-service` | Alerts / reminders / future channels (scaffold) |
 | `services/api-gateway` | HTTP entry: routes `/api/v1/*` to upstreams or `LEGACY_API_URL` |
 | `services/legacy-api` | **Current full API** (clean architecture) until domains are extracted |
@@ -67,5 +67,6 @@ Current split ownership:
 - `/api/v1/auth/*` -> `auth-service`
 - `/api/v1/transactions/*`, `/api/v1/accounts/*`, `/api/v1/categories/*`, `/api/v1/recurring/*` -> `transaction-service`
 - `/api/v1/budgets/*` -> `budget-service`
+- `/api/v1/reports/*` -> `report-service` (safe fallback to `legacy-api` on report-service 404/5xx during parity)
 
 See `deploy/README.md` for the service matrix and ports.

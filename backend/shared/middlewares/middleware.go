@@ -3,19 +3,19 @@ package middlewares
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/httpx"
 	"github.com/moon-eye/velune/shared/jwt"
+	"github.com/moon-eye/velune/shared/stringx"
 	"go.uber.org/zap"
 )
 
 func JWTAuth(secret string, log *zap.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if internalUID := strings.TrimSpace(r.Header.Get("X-User-ID")); internalUID != "" {
+			if internalUID := stringx.TrimSpace(r.Header.Get("X-User-ID")); internalUID != "" {
 				if uid, err := uuid.Parse(internalUID); err == nil && uid != uuid.Nil {
 					ctx := httpx.WithUserID(r.Context(), uid)
 					next.ServeHTTP(w, r.WithContext(ctx))
@@ -23,11 +23,11 @@ func JWTAuth(secret string, log *zap.Logger) func(http.Handler) http.Handler {
 				}
 			}
 			h := r.Header.Get("Authorization")
-			if h == "" || !strings.HasPrefix(strings.ToLower(h), "bearer ") {
+			if h == "" || !stringx.HasPrefix(stringx.Lower(h), "bearer ") {
 				httpx.WriteError(w, errs.ErrUnauthorized)
 				return
 			}
-			raw := strings.TrimSpace(h[7:])
+			raw := stringx.TrimSpace(h[7:])
 			claims, err := jwt.Parse(raw, secret)
 			if err != nil {
 				httpx.WriteError(w, errs.ErrUnauthorized)

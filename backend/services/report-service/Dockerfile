@@ -3,11 +3,11 @@ WORKDIR /src
 COPY shared /src/shared
 COPY services/report-service /src/services/report-service
 WORKDIR /src/services/report-service
-RUN go mod download && CGO_ENABLED=0 go build -o /out/srv ./cmd/server
+RUN go mod download && CGO_ENABLED=0 go build -o /out/srv ./cmd/api
 
 FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
-COPY --from=build /out/srv /app/server
+COPY --from=build /out/srv /app/srv
 USER nonroot:nonroot
-EXPOSE 8080
-ENTRYPOINT ["/app/server"]
+EXPOSE 8085
+ENTRYPOINT ["/app/srv"]

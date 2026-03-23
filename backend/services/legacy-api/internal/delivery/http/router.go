@@ -44,7 +44,6 @@ func NewRouter(s *Server) http.Handler {
 				r.Put("/{id}", s.updateBudget)
 				r.Delete("/{id}", s.deleteBudget)
 			})
-			r.Get("/reports/monthly", s.monthlyReport)
 		})
 	})
 	return r

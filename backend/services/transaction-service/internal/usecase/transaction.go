@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +11,7 @@ import (
 	"github.com/moon-eye/velune/services/transaction-service/internal/repository"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/pagination"
+	"github.com/moon-eye/velune/shared/stringx"
 	"go.uber.org/zap"
 )
 
@@ -47,9 +47,9 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, in Cr
 		CategoryID:            in.CategoryID,
 		CounterpartyAccountID: in.CounterpartyAccountID,
 		AmountMinor:           in.AmountMinor,
-		Currency:              strings.ToUpper(in.Currency),
+		Currency:              stringx.Upper(in.Currency),
 		Type:                  tt,
-		Description:           strings.TrimSpace(in.Description),
+		Description:           stringx.TrimSpace(in.Description),
 		OccurredAt:            in.OccurredAt.UTC(),
 		Version:               1,
 		CreatedAt:             now,
@@ -128,7 +128,7 @@ type UpdateTransactionInput struct {
 
 func (s *TransactionService) List(ctx context.Context, userID uuid.UUID, in ListTransactionsInput) ([]domain.Transaction, int64, error) {
 	p := pagination.Normalize(in.Page, in.Limit)
-	f := repository.TransactionFilter{Currency: strings.ToUpper(in.Currency)}
+	f := repository.TransactionFilter{Currency: stringx.Upper(in.Currency)}
 	if in.AccountID != nil {
 		f.AccountID = in.AccountID
 	}
@@ -204,9 +204,9 @@ func (s *TransactionService) Update(ctx context.Context, userID, id uuid.UUID, v
 	next.CategoryID = in.CategoryID
 	next.CounterpartyAccountID = in.CounterpartyAccountID
 	next.AmountMinor = in.AmountMinor
-	next.Currency = strings.ToUpper(in.Currency)
+	next.Currency = stringx.Upper(in.Currency)
 	next.Type = tt
-	next.Description = strings.TrimSpace(in.Description)
+	next.Description = stringx.TrimSpace(in.Description)
 	next.OccurredAt = in.OccurredAt.UTC()
 	next.Version = current.Version + 1
 	next.UpdatedAt = time.Now().UTC()
@@ -227,9 +227,9 @@ func (s *TransactionService) Update(ctx context.Context, userID, id uuid.UUID, v
 }
 
 func (s *TransactionService) Summary(ctx context.Context, userID uuid.UUID, from, to time.Time, currency string) (int64, int64, error) {
-	return s.Transactions.SumIncomeExpenseInRange(ctx, userID, from.UTC(), to.UTC(), strings.ToUpper(currency))
+	return s.Transactions.SumIncomeExpenseInRange(ctx, userID, from.UTC(), to.UTC(), stringx.Upper(currency))
 }
 
 func (s *TransactionService) SummaryByCategory(ctx context.Context, userID uuid.UUID, from, to time.Time, currency string) (map[uuid.UUID]int64, error) {
-	return s.Transactions.SumExpensesByCategoryInRange(ctx, userID, from.UTC(), to.UTC(), strings.ToUpper(currency))
+	return s.Transactions.SumExpensesByCategoryInRange(ctx, userID, from.UTC(), to.UTC(), stringx.Upper(currency))
 }

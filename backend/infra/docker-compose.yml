@@ -101,8 +101,10 @@ services:
     environment:
       HTTP_PORT: "8085"
       TRANSACTION_SERVICE_URL: http://transaction-service:8082
-      CATEGORY_SERVICE_URL: http://category-service:8083
+      JWT_SECRET: dev-only-change-me
       LOG_FORMAT: dev
+    depends_on:
+      - transaction-service
     ports:
       - "8085:8085"
     profiles: ["split"]

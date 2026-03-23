@@ -56,12 +56,6 @@ func main() {
 	v := validator.New()
 	srv := &httpx.Server{
 		Budgets:     &usecase.BudgetService{Budgets: budgetRepo, Categories: categoryRepo, Transactions: txRepo},
-		Reports: &usecase.ReportService{
-			Transactions: txRepo,
-			Budgets:      budgetRepo,
-			Categories:   categoryRepo,
-			Logger:       log,
-		},
 		Validate:  v,
 		Log:       log,
 		JWTSecret: cfg.JWTSecret,

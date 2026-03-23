@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -35,6 +36,32 @@ func main() {
 		_, _ = w.Write([]byte(`{"status":"ok","service":"api-gateway"}`))
 	})
 	mux.HandleFunc("GET /api/v1/gateway/routes", routesHandler(cfg))
+	mux.HandleFunc("/api/v1/reports", func(w http.ResponseWriter, r *http.Request) {
+		primary := cfg.ReportServiceURL
+		fallback := os.Getenv("LEGACY_API_URL")
+		if primary == "" {
+			if fallback != "" {
+				mustProxy(fallback).ServeHTTP(w, r)
+				return
+			}
+			http.NotFound(w, r)
+			return
+		}
+		reportsProxyWithFallback(primary, fallback).ServeHTTP(w, r)
+	})
+	mux.HandleFunc("/api/v1/reports/", func(w http.ResponseWriter, r *http.Request) {
+		primary := cfg.ReportServiceURL
+		fallback := os.Getenv("LEGACY_API_URL")
+		if primary == "" {
+			if fallback != "" {
+				mustProxy(fallback).ServeHTTP(w, r)
+				return
+			}
+			http.NotFound(w, r)
+			return
+		}
+		reportsProxyWithFallback(primary, fallback).ServeHTTP(w, r)
+	})
 	mux.HandleFunc("/api/v1/", func(w http.ResponseWriter, r *http.Request) {
 		if h := pickProxy(cfg, r.URL.Path); h != nil {
 			h.ServeHTTP(w, r)
@@ -85,7 +112,6 @@ func pickProxy(cfg *sharedconfig.Service, path string) http.Handler {
 		{"/api/v1/recurring", cfg.TransactionServiceURL},
 		{"/api/v1/categories", cfg.TransactionServiceURL},
 		{"/api/v1/budgets", cfg.BudgetServiceURL},
-		{"/api/v1/reports", cfg.ReportServiceURL},
 	}
 	for _, ru := range rules {
 		if ru.target == "" {
@@ -96,6 +122,34 @@ func pickProxy(cfg *sharedconfig.Service, path string) http.Handler {
 		}
 	}
 	return nil
+}
+
+func reportsProxyWithFallback(primaryURL, fallbackURL string) http.Handler {
+	primary, err := url.Parse(primaryURL)
+	if err != nil {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "bad report-service URL", http.StatusInternalServerError)
+		})
+	}
+	primaryProxy := httputil.NewSingleHostReverseProxy(primary)
+	var fallbackProxy http.Handler
+	if fallbackURL != "" {
+		fallbackProxy = mustProxy(fallbackURL)
+	}
+	primaryProxy.ModifyResponse = func(resp *http.Response) error {
+		if resp.StatusCode == http.StatusNotFound || resp.StatusCode >= 500 {
+			return errors.New("report upstream fallback trigger")
+		}
+		return nil
+	}
+	primaryProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, _ error) {
+		if fallbackProxy != nil {
+			fallbackProxy.ServeHTTP(w, r)
+			return
+		}
+		http.Error(w, "report upstream unavailable", http.StatusBadGateway)
+	}
+	return primaryProxy
 }
 
 func mustProxy(origin string) http.Handler {

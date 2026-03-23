@@ -54,13 +54,17 @@ func (c *Client) SummaryByCategory(ctx context.Context, userID uuid.UUID, from, 
 	q.Set("currency", currency)
 	u.RawQuery = q.Encode()
 
-	var out struct {
-		Totals map[uuid.UUID]int64 `json:"totals"`
-	}
+	var out contracts.TransactionCategoryTotalsResponse
 	if err := c.get(ctx, u.String(), userID, &out); err != nil {
 		return nil, err
 	}
-	return out.Totals, nil
+	totals := make(map[uuid.UUID]int64, len(out.Breakdown))
+	for _, item := range out.Breakdown {
+		if item.CategoryID != nil {
+			totals[*item.CategoryID] = item.TotalMinor
+		}
+	}
+	return totals, nil
 }
 
 func (c *Client) get(ctx context.Context, uri string, userID uuid.UUID, v any) error {
@@ -80,4 +84,3 @@ func (c *Client) get(ctx context.Context, uri string, userID uuid.UUID, v any) e
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
 }
-
