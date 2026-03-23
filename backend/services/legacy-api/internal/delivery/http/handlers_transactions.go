@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/legacy-api/internal/usecase"
 	errs "github.com/moon-eye/velune/shared/errors"
+	"github.com/moon-eye/velune/shared/httpx"
 )
 
 type transactionCreateReq struct {
@@ -21,18 +22,18 @@ type transactionCreateReq struct {
 }
 
 func (s *Server) createTransaction(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
 	var req transactionCreateReq
-	if err := decodeJSON(r, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
-	if err := validateStruct(s, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.ValidateStruct(&req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	t, err := s.Transactions.Create(r.Context(), uid, usecase.CreateTransactionInput{
@@ -46,25 +47,25 @@ func (s *Server) createTransaction(w http.ResponseWriter, r *http.Request) {
 		OccurredAt:            req.OccurredAt,
 	})
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusCreated, t)
+	httpx.WriteJSON(w, http.StatusCreated, t)
 }
 
 func (s *Server) listTransactions(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	page, limit := parsePageLimit(r)
+	page, limit := httpx.ParsePageLimit(r)
 	q := r.URL.Query()
 	var accountID, categoryID *uuid.UUID
 	if v := q.Get("accountId"); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			WriteError(w, errs.New("VALIDATION_ERROR", "invalid accountId", http.StatusBadRequest))
+			httpx.WriteError(w, errs.New("VALIDATION_ERROR", "invalid accountId", http.StatusBadRequest))
 			return
 		}
 		accountID = &id
@@ -72,7 +73,7 @@ func (s *Server) listTransactions(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("categoryId"); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
-			WriteError(w, errs.New("VALIDATION_ERROR", "invalid categoryId", http.StatusBadRequest))
+			httpx.WriteError(w, errs.New("VALIDATION_ERROR", "invalid categoryId", http.StatusBadRequest))
 			return
 		}
 		categoryID = &id
@@ -87,36 +88,36 @@ func (s *Server) listTransactions(w http.ResponseWriter, r *http.Request) {
 		AccountID:  accountID,
 		CategoryID: categoryID,
 		Type:       txType,
-		From:       parseTimeQuery(r, "from"),
-		To:         parseTimeQuery(r, "to"),
+		From:       httpx.ParseTimeQuery(r, "from"),
+		To:         httpx.ParseTimeQuery(r, "to"),
 		Currency:   q.Get("currency"),
 	}
 	list, total, err := s.Transactions.List(r.Context(), uid, in)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
 }
 
 func (s *Server) deleteTransaction(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	id, err := parseUUIDParam(r, "id")
+	id, err := httpx.ParseUUID(r.URL.Query().Get("id"))
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	v, ok := parseInt64Query(r, "version")
+	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
 		return
 	}
 	if err := s.Transactions.Delete(r.Context(), uid, id, v); err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

@@ -6,6 +6,10 @@ replace github.com/moon-eye/velune/shared => ../../shared
 
 require (
 	github.com/go-chi/chi/v5 v5.1.0
+	github.com/go-playground/validator/v10 v10.22.0
+	github.com/golang-migrate/migrate/v4 v4.17.1
+	github.com/google/uuid v1.6.0
+	github.com/jackc/pgx/v5 v5.6.0
 	github.com/moon-eye/velune/shared v0.0.0
 	go.uber.org/zap v1.27.0
 )

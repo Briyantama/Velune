@@ -2,9 +2,9 @@ package config
 
 import (
 	"os"
-	"strings"
 	"time"
 
+	"github.com/moon-eye/velune/shared/stringx"
 	"github.com/spf13/viper"
 )
 
@@ -18,7 +18,7 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.SetEnvKeyReplacer(stringx.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 	viper.SetDefault("HTTP_PORT", "8080")
 	viper.SetDefault("JWT_EXPIRY", "24h")

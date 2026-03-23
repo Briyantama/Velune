@@ -5,6 +5,7 @@ import (
 
 	"github.com/moon-eye/velune/services/legacy-api/internal/usecase"
 	errs "github.com/moon-eye/velune/shared/errors"
+	"github.com/moon-eye/velune/shared/httpx"
 )
 
 type accountCreateReq struct {
@@ -19,18 +20,18 @@ type accountUpdateReq struct {
 }
 
 func (s *Server) createAccount(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
 	var req accountCreateReq
-	if err := decodeJSON(r, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
-	if err := validateStruct(s, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.ValidateStruct(&req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	a, err := s.Accounts.Create(r.Context(), uid, usecase.CreateAccountInput{
@@ -39,69 +40,69 @@ func (s *Server) createAccount(w http.ResponseWriter, r *http.Request) {
 		Currency: req.Currency,
 	})
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusCreated, a)
+	httpx.WriteJSON(w, http.StatusCreated, a)
 }
 
 func (s *Server) listAccounts(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	page, limit := parsePageLimit(r)
+	page, limit := httpx.ParsePageLimit(r)
 	list, total, err := s.Accounts.List(r.Context(), uid, page, limit)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	id, err := parseUUIDParam(r, "id")
+	id, err := httpx.ParseUUID(r.URL.Query().Get("id"))
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
 	a, err := s.Accounts.Get(r.Context(), uid, id)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusOK, a)
+	httpx.WriteJSON(w, http.StatusOK, a)
 }
 
 func (s *Server) updateAccount(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	id, err := parseUUIDParam(r, "id")
+	id, err := httpx.ParseUUID(r.URL.Query().Get("id"))
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
 	var req accountUpdateReq
-	if err := decodeJSON(r, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
-	if err := validateStruct(s, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.ValidateStruct(&req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
-	v, ok := parseInt64Query(r, "version")
+	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
 		return
 	}
 	a, err := s.Accounts.Update(r.Context(), uid, id, v, usecase.UpdateAccountInput{
@@ -109,30 +110,30 @@ func (s *Server) updateAccount(w http.ResponseWriter, r *http.Request) {
 		Type: req.Type,
 	})
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusOK, a)
+	httpx.WriteJSON(w, http.StatusOK, a)
 }
 
 func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	id, err := parseUUIDParam(r, "id")
+	id, err := httpx.ParseUUID(r.URL.Query().Get("id"))
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	v, ok := parseInt64Query(r, "version")
+	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
 		return
 	}
 	if err := s.Accounts.Delete(r.Context(), uid, id, v); err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

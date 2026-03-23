@@ -8,6 +8,88 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Account struct {
+	ID           pgtype.UUID
+	UserID       pgtype.UUID
+	Name         string
+	Type         string
+	Currency     string
+	BalanceMinor int64
+	Version      int64
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+	DeletedAt    pgtype.Timestamptz
+}
+
+type Budget struct {
+	ID               pgtype.UUID
+	UserID           pgtype.UUID
+	Name             string
+	PeriodType       string
+	CategoryID       pgtype.UUID
+	StartDate        pgtype.Date
+	EndDate          pgtype.Date
+	LimitAmountMinor int64
+	Currency         string
+	Version          int64
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	DeletedAt        pgtype.Timestamptz
+}
+
+type Category struct {
+	ID        pgtype.UUID
+	UserID    pgtype.UUID
+	Name      string
+	ParentID  pgtype.UUID
+	Version   int64
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+	DeletedAt pgtype.Timestamptz
+}
+
+type ChangeEvent struct {
+	ID         int64
+	UserID     pgtype.UUID
+	EntityType string
+	EntityID   pgtype.UUID
+	Operation  string
+	Version    int64
+	Payload    []byte
+	CreatedAt  pgtype.Timestamptz
+}
+
+type LedgerEntry struct {
+	ID            pgtype.UUID
+	TransactionID pgtype.UUID
+	UserID        pgtype.UUID
+	AccountID     pgtype.UUID
+	Direction     string
+	AmountMinor   int64
+	Currency      string
+	Reason        string
+	CreatedAt     pgtype.Timestamptz
+}
+
+type RecurringRule struct {
+	ID          pgtype.UUID
+	UserID      pgtype.UUID
+	AccountID   pgtype.UUID
+	CategoryID  pgtype.UUID
+	AmountMinor int64
+	Currency    string
+	Type        string
+	Frequency   string
+	NextRunAt   pgtype.Timestamptz
+	LastRunAt   pgtype.Timestamptz
+	IsActive    bool
+	Description string
+	Version     int64
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	DeletedAt   pgtype.Timestamptz
+}
+
 type RefreshToken struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID
@@ -17,6 +99,24 @@ type RefreshToken struct {
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
 	DeletedAt pgtype.Timestamptz
+}
+
+type Transaction struct {
+	ID                    pgtype.UUID
+	UserID                pgtype.UUID
+	AccountID             pgtype.UUID
+	CategoryID            pgtype.UUID
+	CounterpartyAccountID pgtype.UUID
+	AmountMinor           int64
+	Currency              string
+	Type                  string
+	Description           string
+	OccurredAt            pgtype.Timestamptz
+	Status                string
+	Version               int64
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	DeletedAt             pgtype.Timestamptz
 }
 
 type User struct {

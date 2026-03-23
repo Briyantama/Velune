@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/legacy-api/internal/usecase"
 	errs "github.com/moon-eye/velune/shared/errors"
+	"github.com/moon-eye/velune/shared/httpx"
 )
 
 type categoryCreateReq struct {
@@ -19,18 +20,18 @@ type categoryUpdateReq struct {
 }
 
 func (s *Server) createCategory(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
 	var req categoryCreateReq
-	if err := decodeJSON(r, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
-	if err := validateStruct(s, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.ValidateStruct(&req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	c, err := s.Categories.Create(r.Context(), uid, usecase.CreateCategoryInput{
@@ -38,50 +39,50 @@ func (s *Server) createCategory(w http.ResponseWriter, r *http.Request) {
 		ParentID: req.ParentID,
 	})
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusCreated, c)
+	httpx.WriteJSON(w, http.StatusCreated, c)
 }
 
 func (s *Server) listCategories(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	page, limit := parsePageLimit(r)
+	page, limit := httpx.ParsePageLimit(r)
 	list, total, err := s.Categories.List(r.Context(), uid, page, limit)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
 }
 
 func (s *Server) updateCategory(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	id, err := parseUUIDParam(r, "id")
+	id, err := httpx.ParseUUID(r.URL.Query().Get("id"))
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
 	var req categoryUpdateReq
-	if err := decodeJSON(r, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
-	if err := validateStruct(s, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.ValidateStruct(&req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
-	v, ok := parseInt64Query(r, "version")
+	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
 		return
 	}
 	c, err := s.Categories.Update(r.Context(), uid, id, v, usecase.UpdateCategoryInput{
@@ -89,30 +90,30 @@ func (s *Server) updateCategory(w http.ResponseWriter, r *http.Request) {
 		ParentID: req.ParentID,
 	})
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusOK, c)
+	httpx.WriteJSON(w, http.StatusOK, c)
 }
 
 func (s *Server) deleteCategory(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	id, err := parseUUIDParam(r, "id")
+	id, err := httpx.ParseUUID(r.URL.Query().Get("id"))
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	v, ok := parseInt64Query(r, "version")
+	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
 		return
 	}
 	if err := s.Categories.Delete(r.Context(), uid, id, v); err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

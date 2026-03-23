@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/legacy-api/internal/usecase"
 	errs "github.com/moon-eye/velune/shared/errors"
+	"github.com/moon-eye/velune/shared/httpx"
 )
 
 type recurringCreateReq struct {
@@ -21,18 +22,18 @@ type recurringCreateReq struct {
 }
 
 func (s *Server) createRecurring(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
 	var req recurringCreateReq
-	if err := decodeJSON(r, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
-	if err := validateStruct(s, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.ValidateStruct(&req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	rr, err := s.Recurring.Create(r.Context(), uid, usecase.CreateRecurringInput{
@@ -46,46 +47,46 @@ func (s *Server) createRecurring(w http.ResponseWriter, r *http.Request) {
 		Description: req.Description,
 	})
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusCreated, rr)
+	httpx.WriteJSON(w, http.StatusCreated, rr)
 }
 
 func (s *Server) listRecurring(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	page, limit := parsePageLimit(r)
+	page, limit := httpx.ParsePageLimit(r)
 	activeOnly := r.URL.Query().Get("activeOnly") == "true"
 	list, total, err := s.Recurring.List(r.Context(), uid, page, limit, activeOnly)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
 }
 
 func (s *Server) deleteRecurring(w http.ResponseWriter, r *http.Request) {
-	uid, err := mustUserID(r)
+	uid, err := httpx.MustUserID(r)
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	id, err := parseUUIDParam(r, "id")
+	id, err := httpx.ParseUUID(r.URL.Query().Get("id"))
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	v, ok := parseInt64Query(r, "version")
+	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
 		return
 	}
 	if err := s.Recurring.Delete(r.Context(), uid, id, v); err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

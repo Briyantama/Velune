@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/moon-eye/velune/services/legacy-api/internal/usecase"
+	"github.com/moon-eye/velune/shared/httpx"
 )
 
 type registerReq struct {
@@ -19,12 +20,12 @@ type loginReq struct {
 
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	var req registerReq
-	if err := decodeJSON(r, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
-	if err := validateStruct(s, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.ValidateStruct(&req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	tok, err := s.Auth.Register(r.Context(), usecase.RegisterInput{
@@ -33,20 +34,20 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		BaseCurrency: req.BaseCurrency,
 	})
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusCreated, tok)
+	httpx.WriteJSON(w, http.StatusCreated, tok)
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	var req loginReq
-	if err := decodeJSON(r, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
-	if err := validateStruct(s, &req); err != nil {
-		WriteError(w, err)
+	if err := httpx.ValidateStruct(&req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	tok, err := s.Auth.Login(r.Context(), usecase.LoginInput{
@@ -54,8 +55,8 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		Password: req.Password,
 	})
 	if err != nil {
-		WriteError(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusOK, tok)
+	httpx.WriteJSON(w, http.StatusOK, tok)
 }

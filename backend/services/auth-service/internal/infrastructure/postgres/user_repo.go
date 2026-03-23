@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +12,7 @@ import (
 	"github.com/moon-eye/velune/services/auth-service/internal/domain"
 	"github.com/moon-eye/velune/services/auth-service/internal/repository"
 	"github.com/moon-eye/velune/shared/sqlc/generated"
+	"github.com/moon-eye/velune/shared/stringx"
 )
 
 type UserRepo struct {
@@ -29,9 +29,9 @@ func (r *UserRepo) Create(ctx context.Context, u *domain.User) error {
 			Bytes: u.ID,
 			Valid: true,
 		},
-		Email:        strings.ToLower(u.Email),
+		Email:        stringx.Lower(u.Email),
 		PasswordHash: u.PasswordHash,
-		BaseCurrency: strings.ToUpper(u.BaseCurrency),
+		BaseCurrency: stringx.Upper(u.BaseCurrency),
 		Version:      u.Version,
 		CreatedAt: pgtype.Timestamptz{
 			Time:  u.CreatedAt,

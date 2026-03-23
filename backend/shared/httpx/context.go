@@ -1,4 +1,4 @@
-package httpapi
+package httpx
 
 import (
 	"context"
@@ -8,18 +8,18 @@ import (
 
 type ctxKey int
 
-const userIDKey ctxKey = 1
+const UserIDKey ctxKey = 1
 
 type ridKey int
 
-const requestIDKey ridKey = 1
+const RequestIDKey ridKey = 1
 
 func WithUserID(ctx context.Context, id uuid.UUID) context.Context {
-	return context.WithValue(ctx, userIDKey, id)
+	return context.WithValue(ctx, UserIDKey, id)
 }
 
 func UserID(ctx context.Context) (uuid.UUID, bool) {
-	v := ctx.Value(userIDKey)
+	v := ctx.Value(UserIDKey)
 	if v == nil {
 		return uuid.Nil, false
 	}

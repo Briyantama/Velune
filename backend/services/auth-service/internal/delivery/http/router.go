@@ -1,14 +1,14 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 	"github.com/moon-eye/velune/services/auth-service/internal/usecase"
 	errs "github.com/moon-eye/velune/shared/errors"
+	"github.com/moon-eye/velune/shared/httpx"
+	"github.com/moon-eye/velune/shared/stringx"
 )
 
 type Server struct {
@@ -42,12 +42,12 @@ type refreshReq struct {
 
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	var req registerReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeErr(w, err)
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	if err := s.Validate.Struct(req); err != nil {
-		writeErr(w, errs.New("VALIDATION_ERROR", err.Error(), http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", err.Error(), http.StatusBadRequest))
 		return
 	}
 
@@ -57,20 +57,20 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		BaseCurrency: req.BaseCurrency,
 	})
 	if err != nil {
-		writeErr(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, resp)
+	httpx.WriteJSON(w, http.StatusCreated, resp)
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req loginReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeErr(w, err)
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	if err := s.Validate.Struct(req); err != nil {
-		writeErr(w, errs.New("VALIDATION_ERROR", err.Error(), http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", err.Error(), http.StatusBadRequest))
 		return
 	}
 
@@ -79,20 +79,20 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Password: req.Password,
 	})
 	if err != nil {
-		writeErr(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, resp)
+	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 	var req refreshReq
-	if err := decodeJSON(r, &req); err != nil {
-		writeErr(w, err)
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	if err := s.Validate.Struct(req); err != nil {
-		writeErr(w, errs.New("VALIDATION_ERROR", err.Error(), http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", err.Error(), http.StatusBadRequest))
 		return
 	}
 
@@ -100,56 +100,28 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		RefreshToken: req.RefreshToken,
 	})
 	if err != nil {
-		writeErr(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, resp)
+	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
-	token := strings.TrimSpace(r.Header.Get("Authorization"))
-	if token == "" || !strings.HasPrefix(strings.ToLower(token), "bearer ") {
-		writeErr(w, errs.ErrUnauthorized)
+	token := stringx.TrimSpace(r.Header.Get("Authorization"))
+	if token == "" || !stringx.HasPrefix(stringx.Lower(token), "bearer ") {
+		httpx.WriteError(w, errs.ErrUnauthorized)
 		return
 	}
-	token = strings.TrimSpace(token[len("bearer "):])
+	token = stringx.TrimSpace(token[len("bearer "):])
 	if token == "" {
-		writeErr(w, errs.ErrUnauthorized)
+		httpx.WriteError(w, errs.ErrUnauthorized)
 		return
 	}
 
 	resp, err := s.Auth.Me(r.Context(), token)
 	if err != nil {
-		writeErr(w, err)
+		httpx.WriteError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, resp)
-}
-
-func decodeJSON(r *http.Request, v any) error {
-	defer r.Body.Close()
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(v); err != nil {
-		return errs.New("VALIDATION_ERROR", err.Error(), http.StatusBadRequest)
-	}
-	return nil
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
-}
-
-func writeErr(w http.ResponseWriter, err error) {
-	ae, ok := err.(*errs.AppError)
-	if ok && ae != nil {
-		writeJSON(w, ae.Status, map[string]string{"code": ae.Code, "message": ae.Message})
-		return
-	}
-	writeJSON(w, errs.ErrInternal.Status, map[string]string{
-		"code":    errs.ErrInternal.Code,
-		"message": errs.ErrInternal.Message,
-	})
+	httpx.WriteJSON(w, http.StatusOK, resp)
 }

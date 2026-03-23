@@ -8,7 +8,6 @@ import (
 	"errors"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +16,7 @@ import (
 	"github.com/moon-eye/velune/services/auth-service/internal/repository"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/jwt"
+	"github.com/moon-eye/velune/shared/stringx"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -79,7 +79,7 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*TokenRes
 	}
 
 	now := time.Now().UTC()
-	baseCur := strings.ToUpper(strings.TrimSpace(in.BaseCurrency))
+	baseCur := stringx.Upper(stringx.TrimSpace(in.BaseCurrency))
 	if baseCur == "" {
 		baseCur = "USD"
 	}
@@ -123,7 +123,7 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*TokenResponse,
 }
 
 func (s *AuthService) Refresh(ctx context.Context, in RefreshInput) (*TokenResponse, error) {
-	rt := strings.TrimSpace(in.RefreshToken)
+	rt := stringx.TrimSpace(in.RefreshToken)
 	if rt == "" {
 		return nil, errs.New("AUTH_INVALID_REFRESH_TOKEN", "invalid refresh token", http.StatusUnauthorized)
 	}
@@ -232,7 +232,7 @@ func (s *AuthService) refreshTTL() time.Duration {
 		return s.RefreshTTL
 	}
 	// Safe default: 30 days (overridable via REFRESH_TOKEN_TTL).
-	if v := strings.TrimSpace(os.Getenv("REFRESH_TOKEN_TTL")); v != "" {
+	if v := stringx.TrimSpace(os.Getenv("REFRESH_TOKEN_TTL")); v != "" {
 		if dur, err := time.ParseDuration(v); err == nil && dur > 0 {
 			return dur
 		}
@@ -241,7 +241,7 @@ func (s *AuthService) refreshTTL() time.Duration {
 }
 
 func normalizeEmail(email string) string {
-	return strings.ToLower(strings.TrimSpace(email))
+	return stringx.Lower(stringx.TrimSpace(email))
 }
 
 func generateOpaqueToken(nbytes int) (string, error) {

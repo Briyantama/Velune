@@ -8,12 +8,12 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	sharedconfig "github.com/moon-eye/velune/shared/config"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
+	"github.com/moon-eye/velune/shared/stringx"
 	"go.uber.org/zap"
 )
 
@@ -83,7 +83,7 @@ func pickProxy(cfg *sharedconfig.Service, path string) http.Handler {
 		{"/api/v1/transactions", cfg.TransactionServiceURL},
 		{"/api/v1/accounts", cfg.TransactionServiceURL},
 		{"/api/v1/recurring", cfg.TransactionServiceURL},
-		{"/api/v1/categories", cfg.CategoryServiceURL},
+		{"/api/v1/categories", cfg.TransactionServiceURL},
 		{"/api/v1/budgets", cfg.BudgetServiceURL},
 		{"/api/v1/reports", cfg.ReportServiceURL},
 	}
@@ -91,7 +91,7 @@ func pickProxy(cfg *sharedconfig.Service, path string) http.Handler {
 		if ru.target == "" {
 			continue
 		}
-		if strings.HasPrefix(path, ru.prefix) {
+		if stringx.HasPrefix(path, ru.prefix) {
 			return mustProxy(ru.target)
 		}
 	}

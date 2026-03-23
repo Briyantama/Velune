@@ -5,13 +5,13 @@ Multi-service **Expense Tracker / Money Manager** backend: independent deployabl
 ## Layout
 
 | Path | Purpose |
-|------|---------|
+| ---- | ------- |
 | `go.work` | Go workspace — open this folder in the IDE; build/test per module |
 | `shared/` | Common libraries: `config`, `logger`, `errors` (errs), `jwt`, `pagination`, `money`, `contracts` |
 | `services/auth-service` | Identity, JWT access/refresh, password hashing ([docs](services/auth-service/README.md)) |
-| `services/transaction-service` | Ledger, accounts, transactions, recurring (scaffold) |
-| `services/category-service` | Categories (scaffold) |
-| `services/budget-service` | Budgets & limits (scaffold) |
+| `services/transaction-service` | Ledger source of truth: accounts, categories, transactions, recurring, summaries ([docs](services/transaction-service/README.md)) |
+| `services/category-service` | Categories (legacy scaffold; `/api/v1/categories` now routed to transaction-service) |
+| `services/budget-service` | Budgets + budget usage/overspend via transaction contracts ([docs](services/budget-service/README.md)) |
 | `services/report-service` | Aggregations; calls peers via HTTP only (scaffold) |
 | `services/notification-service` | Alerts / reminders / future channels (scaffold) |
 | `services/api-gateway` | HTTP entry: routes `/api/v1/*` to upstreams or `LEGACY_API_URL` |
@@ -38,7 +38,10 @@ Multi-service **Expense Tracker / Money Manager** backend: independent deployabl
    go run ./cmd/api
    ```
 
-4. **Scaffold/services:** auth-service uses `cmd/api` — e.g. `go run ./services/auth-service/cmd/api` from `backend/` (set `HTTP_PORT`).
+4. **Services:** run from `cmd/api` for extracted services, for example:
+   - `go run ./services/auth-service/cmd/api`
+   - `go run ./services/transaction-service/cmd/api`
+   - `go run ./services/budget-service/cmd/api`
 
 5. **Docker:** `docker compose -f infra/docker-compose.yml up legacy-api postgres redis` — Postgres + legacy API on port **8090** (see compose file).
 
@@ -58,5 +61,11 @@ Add unit tests per service under `internal/usecase` / `domain` as features are e
 2. Implement a bounded context in its dedicated service + DB schema.
 3. Point **`api-gateway`** env vars for that path prefix to the new service.
 4. When all paths are migrated, remove `LEGACY_API_URL` and retire `legacy-api`.
+
+Current split ownership:
+
+- `/api/v1/auth/*` -> `auth-service`
+- `/api/v1/transactions/*`, `/api/v1/accounts/*`, `/api/v1/categories/*`, `/api/v1/recurring/*` -> `transaction-service`
+- `/api/v1/budgets/*` -> `budget-service`
 
 See `deploy/README.md` for the service matrix and ports.

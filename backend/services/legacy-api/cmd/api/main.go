@@ -49,20 +49,13 @@ func main() {
 	}
 	defer store.Close()
 
-	accountRepo := postgres.NewAccountRepo(store)
+	budgetRepo := postgres.NewBudgetRepo(store)
 	categoryRepo := postgres.NewCategoryRepo(store)
 	txRepo := postgres.NewTransactionRepo(store)
-	budgetRepo := postgres.NewBudgetRepo(store)
-	recurringRepo := postgres.NewRecurringRepo(store)
-	ledger := postgres.NewLedger(store)
 
 	v := validator.New()
 	srv := &httpx.Server{
-		Accounts:     &usecase.AccountService{Accounts: accountRepo},
-		Categories:   &usecase.CategoryService{Categories: categoryRepo},
-		Transactions: &usecase.TransactionService{Ledger: ledger, Transactions: txRepo, Accounts: accountRepo, Categories: categoryRepo, Logger: log},
 		Budgets:     &usecase.BudgetService{Budgets: budgetRepo, Categories: categoryRepo, Transactions: txRepo},
-		Recurring:   &usecase.RecurringService{Recurring: recurringRepo, Accounts: accountRepo, Categories: categoryRepo},
 		Reports: &usecase.ReportService{
 			Transactions: txRepo,
 			Budgets:      budgetRepo,
