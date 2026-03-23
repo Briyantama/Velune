@@ -1,0 +1,13 @@
+go 1.22
+
+use (
+	./services/api-gateway
+	./services/auth-service
+	./services/budget-service
+	./services/category-service
+	./services/legacy-api
+	./services/notification-service
+	./services/report-service
+	./services/transaction-service
+	./shared
+)

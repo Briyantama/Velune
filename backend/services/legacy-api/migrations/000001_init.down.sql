@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS change_events;
+DROP TABLE IF EXISTS recurring_rules;
+DROP TABLE IF EXISTS budgets;
+DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS accounts;
+DROP TABLE IF EXISTS users;

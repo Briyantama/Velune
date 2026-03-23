@@ -1,0 +1,129 @@
+# Local development: one Postgres (multiple DBs via init), Redis for future queues, all Go services.
+# Strangler: set LEGACY_API_URL on api-gateway to the legacy-api container until microservices own full API surface.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  legacy-api:
+    build:
+      context: ..
+      dockerfile: services/legacy-api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_legacy?sslmode=disable
+      JWT_SECRET: dev-only-change-me
+      HTTP_PORT: "8090"
+      MIGRATIONS_PATH: file:///app/migrations
+    ports:
+      - "8090:8090"
+    depends_on:
+      - postgres
+
+  auth-service:
+    build:
+      context: ..
+      dockerfile: services/auth-service/Dockerfile
+    environment:
+      HTTP_PORT: "8081"
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_auth?sslmode=disable
+      JWT_SECRET: dev-only-change-me
+      MIGRATIONS_PATH: file:///app/migrations
+      LOG_FORMAT: dev
+    depends_on:
+      - postgres
+    ports:
+      - "8081:8081"
+    profiles: ["split"]
+
+  transaction-service:
+    build:
+      context: ..
+      dockerfile: services/transaction-service/Dockerfile
+    environment:
+      HTTP_PORT: "8082"
+      LOG_FORMAT: dev
+    ports:
+      - "8082:8082"
+    profiles: ["split"]
+
+  category-service:
+    build:
+      context: ..
+      dockerfile: services/category-service/Dockerfile
+    environment:
+      HTTP_PORT: "8083"
+      LOG_FORMAT: dev
+    ports:
+      - "8083:8083"
+    profiles: ["split"]
+
+  budget-service:
+    build:
+      context: ..
+      dockerfile: services/budget-service/Dockerfile
+    environment:
+      HTTP_PORT: "8084"
+      LOG_FORMAT: dev
+    ports:
+      - "8084:8084"
+    profiles: ["split"]
+
+  report-service:
+    build:
+      context: ..
+      dockerfile: services/report-service/Dockerfile
+    environment:
+      HTTP_PORT: "8085"
+      TRANSACTION_SERVICE_URL: http://transaction-service:8082
+      CATEGORY_SERVICE_URL: http://category-service:8083
+      LOG_FORMAT: dev
+    ports:
+      - "8085:8085"
+    profiles: ["split"]
+
+  notification-service:
+    build:
+      context: ..
+      dockerfile: services/notification-service/Dockerfile
+    environment:
+      HTTP_PORT: "8086"
+      LOG_FORMAT: dev
+    ports:
+      - "8086:8086"
+    profiles: ["split"]
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: services/api-gateway/Dockerfile
+    environment:
+      HTTP_PORT: "8080"
+      AUTH_SERVICE_URL: http://auth-service:8081
+      TRANSACTION_SERVICE_URL: http://transaction-service:8082
+      CATEGORY_SERVICE_URL: http://category-service:8083
+      BUDGET_SERVICE_URL: http://budget-service:8084
+      REPORT_SERVICE_URL: http://report-service:8085
+      LEGACY_API_URL: http://legacy-api:8090
+      LOG_FORMAT: dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      - legacy-api
+    profiles: ["split"]
+
+volumes:
+  pgdata:
