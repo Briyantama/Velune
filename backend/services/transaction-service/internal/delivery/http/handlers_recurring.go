@@ -90,5 +90,5 @@ func (s *Server) deleteRecurring(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	w.WriteHeader(constx.StatusNoContent)
 }
