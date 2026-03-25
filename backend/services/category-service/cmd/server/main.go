@@ -13,6 +13,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	sharedconfig "github.com/moon-eye/velune/shared/config"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
+	"github.com/moon-eye/velune/shared/metrics"
+	"github.com/moon-eye/velune/shared/middlewares"
 	"go.uber.org/zap"
 )
 
@@ -27,11 +29,13 @@ func main() {
 		log.Fatal("config", zap.Error(err))
 	}
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID, middleware.RealIP, middleware.Recoverer)
+	r.Use(middlewares.CorrelationIDHeader)
+	r.Use(middleware.RealIP, middleware.Recoverer)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok","service":"category-service"}`))
 	})
+	r.Handle("/metrics", metrics.Handler())
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/meta", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")

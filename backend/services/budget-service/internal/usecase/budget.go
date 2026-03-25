@@ -13,6 +13,8 @@ import (
 	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/helper"
+	"github.com/moon-eye/velune/shared/httpx"
+	"github.com/moon-eye/velune/shared/metrics"
 	"github.com/moon-eye/velune/shared/pagination"
 	"github.com/moon-eye/velune/shared/stringx"
 )
@@ -179,7 +181,7 @@ func (s *BudgetService) Usage(ctx context.Context, userID, budgetID uuid.UUID) (
 	if b.LimitAmountMinor > 0 {
 		usagePercent = (float64(spent) / float64(b.LimitAmountMinor)) * 100
 	}
-	envelopePayload, _ := json.Marshal(contracts.EventEnvelope{
+	env := contracts.EventEnvelope{
 		EventID:     uuid.New(),
 		EventType:   contracts.EventOverspendAlertRequested,
 		Source:      "budget-service",
@@ -196,9 +198,20 @@ func (s *BudgetService) Usage(ctx context.Context, userID, budgetID uuid.UUID) (
 			UsagePercent:     usagePercent,
 			IsOverspent:      overspent > 0,
 		}),
-	})
-	if _, err := s.Budgets.TransitionAlertStateAndEnqueue(ctx, b.ID, usagePercent, envelopePayload); err != nil {
+	}
+	if cid, ok := httpx.CorrelationID(ctx); ok {
+		env.CorrelationID = cid
+	}
+	envelopePayload, err := json.Marshal(env)
+	if err != nil {
 		return nil, err
+	}
+	emitted, err := s.Budgets.TransitionAlertStateAndEnqueue(ctx, b.ID, usagePercent, envelopePayload)
+	if err != nil {
+		return nil, err
+	}
+	if emitted {
+		metrics.OverspendEventsTotal.Inc()
 	}
 	return result, nil
 }

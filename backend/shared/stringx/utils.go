@@ -33,3 +33,20 @@ func HasSuffix(s, suffix string) bool {
 func NewReplacer(old, new string) *strings.Replacer {
 	return strings.NewReplacer(old, new)
 }
+
+func TrimRight(s, suffix string) string {
+	return strings.TrimRight(s, suffix)
+}
+
+func TrimLeft(s, prefix string) string {
+	return strings.TrimLeft(s, prefix)
+}
+
+func StringsEqualTrue(s string) bool {
+	switch strings.TrimSpace(strings.ToLower(s)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}

@@ -1,6 +1,7 @@
 go 1.25.0
 
 use (
+	./services/admin-service
 	./services/api-gateway
 	./services/auth-service
 	./services/budget-service

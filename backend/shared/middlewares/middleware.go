@@ -1,7 +1,6 @@
 package middlewares
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -56,8 +55,30 @@ func RequestIDHeader(next http.Handler) http.Handler {
 		if rid == "" {
 			rid = uuid.New().String()
 		}
-		ctx := context.WithValue(r.Context(), httpx.RequestIDKey, rid)
+		ctx := httpx.WithRequestID(r.Context(), rid)
 		w.Header().Set("X-Request-ID", rid)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// CorrelationIDHeader ensures X-Correlation-ID exists and stores it in context with X-Request-ID.
+func CorrelationIDHeader(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cid := stringx.TrimSpace(r.Header.Get("X-Correlation-ID"))
+		if cid == "" {
+			cid = uuid.New().String()
+		}
+		w.Header().Set("X-Correlation-ID", cid)
+		ctx := httpx.WithCorrelationID(r.Context(), cid)
+
+		rid := stringx.TrimSpace(r.Header.Get("X-Request-ID"))
+		if rid == "" {
+			rid = uuid.New().String()
+			w.Header().Set("X-Request-ID", rid)
+		} else {
+			w.Header().Set("X-Request-ID", rid)
+		}
+		ctx = httpx.WithRequestID(ctx, rid)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

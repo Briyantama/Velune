@@ -30,14 +30,9 @@ services:
       context: ..
       dockerfile: services/legacy-api/Dockerfile
     environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_legacy?sslmode=disable
-      JWT_SECRET: dev-only-change-me
       HTTP_PORT: "8090"
-      MIGRATIONS_PATH: file:///app/migrations
     ports:
       - "8090:8090"
-    depends_on:
-      - postgres
 
   auth-service:
     build:
@@ -74,6 +69,7 @@ services:
       OUTBOX_BATCH_SIZE: "50"
       OUTBOX_MAX_RETRY: "7"
       RETRY_BASE_DELAY_SECONDS: "2"
+      ADMIN_INTERNAL_KEY: ${ADMIN_INTERNAL_KEY:-dev-admin-internal-key}
     depends_on:
       - postgres
       - rabbitmq
@@ -161,6 +157,41 @@ services:
       - postgres
     ports:
       - "8086:8086"
+    profiles: ["split"]
+
+  admin-service:
+    build:
+      context: ..
+      dockerfile: services/admin-service/Dockerfile
+    environment:
+      HTTP_HOST: "0.0.0.0"
+      HTTP_PORT: "8099"
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-dev-admin-api-key}
+      ADMIN_INTERNAL_KEY: ${ADMIN_INTERNAL_KEY:-dev-admin-internal-key}
+      TRANSACTION_DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_transaction?sslmode=disable
+      BUDGET_DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_budget?sslmode=disable
+      NOTIFICATION_DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_notification?sslmode=disable
+      BROKER_URL: amqp://guest:guest@rabbitmq:5672/
+      BROKER_EXCHANGE: velune.events
+      BROKER_ROUTING_KEY: notification.overspend.requested
+      BROKER_DLX: velune.events.dlx
+      BROKER_DLQ: velune.events.dlq
+      BROKER_DLQ_ROUTING_KEY: velune.dlq
+      AUTH_SERVICE_URL: http://auth-service:8081
+      TRANSACTION_SERVICE_URL: http://transaction-service:8082
+      CATEGORY_SERVICE_URL: http://category-service:8083
+      BUDGET_SERVICE_URL: http://budget-service:8084
+      REPORT_SERVICE_URL: http://report-service:8085
+      NOTIFICATION_SERVICE_URL: http://notification-service:8086
+      LOG_FORMAT: dev
+    depends_on:
+      - postgres
+      - rabbitmq
+      - transaction-service
+      - budget-service
+      - notification-service
+    ports:
+      - "127.0.0.1:8099:8099"
     profiles: ["split"]
 
   api-gateway:

@@ -7,9 +7,10 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"github.com/moon-eye/velune/shared/contracts"
 	"github.com/moon-eye/velune/shared/constx"
+	"github.com/moon-eye/velune/shared/contracts"
 	errs "github.com/moon-eye/velune/shared/errors"
+	"github.com/moon-eye/velune/shared/sim"
 )
 
 type RabbitPublisher struct {
@@ -19,12 +20,17 @@ type RabbitPublisher struct {
 	dlx               string
 	dlqRoutingKey     string
 	defaultRoutingKey string
+	sim               *sim.Config
 }
 
-func NewRabbitPublisher(url, exchange, routingKey string, dlx string, dlqRoutingKey string) (*RabbitPublisher, error) {
+// NewRabbitPublisher connects to RabbitMQ. sim may be nil or sim.LoadFromEnv(); Publish fail injection never applies to PublishDLQ.
+func NewRabbitPublisher(url, exchange, routingKey string, dlx string, dlqRoutingKey string, chaos *sim.Config) (*RabbitPublisher, error) {
+	if chaos != nil && chaos.BrokerDown {
+		return nil, errs.New("UPSTREAM_UNAVAILABLE", "rabbitmq unavailable (simulated broker down)", constx.StatusBadGateway)
+	}
 	conn, err := amqp.Dial(url)
 	if err != nil {
-		return nil, errs.New("UPSTREAM_UNAVAILABLE", "rabbitmq unavailable",constx.StatusBadGateway)
+		return nil, errs.New("UPSTREAM_UNAVAILABLE", "rabbitmq unavailable", constx.StatusBadGateway)
 	}
 	ch, err := conn.Channel()
 	if err != nil {
@@ -46,6 +52,7 @@ func NewRabbitPublisher(url, exchange, routingKey string, dlx string, dlqRouting
 		dlx:               dlx,
 		dlqRoutingKey:     dlqRoutingKey,
 		defaultRoutingKey: routingKey,
+		sim:               chaos,
 	}, nil
 }
 
@@ -80,6 +87,9 @@ func (p *RabbitPublisher) PublishDLQ(ctx context.Context, env contracts.EventEnv
 }
 
 func (p *RabbitPublisher) Publish(ctx context.Context, env contracts.EventEnvelope) error {
+	if p.sim != nil && p.sim.SimulatePublishFailure() {
+		return sim.ErrSimulatedPublishFailure
+	}
 	body, err := json.Marshal(env)
 	if err != nil {
 		return err

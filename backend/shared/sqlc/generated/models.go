@@ -21,6 +21,14 @@ type Account struct {
 	DeletedAt    pgtype.Timestamptz
 }
 
+type AuditLog struct {
+	ID        pgtype.UUID
+	Type      string
+	Status    string
+	Details   []byte
+	CreatedAt pgtype.Timestamptz
+}
+
 type Budget struct {
 	ID               pgtype.UUID
 	UserID           pgtype.UUID
@@ -67,6 +75,12 @@ type ChangeEvent struct {
 	CreatedAt  pgtype.Timestamptz
 }
 
+type EventDedupe struct {
+	IdempotencyKey string
+	EventID        pgtype.UUID
+	ProcessedAt    pgtype.Timestamptz
+}
+
 type EventOutbox struct {
 	ID          pgtype.UUID
 	EventType   string
@@ -88,6 +102,18 @@ type LedgerEntry struct {
 	Currency      string
 	Reason        string
 	CreatedAt     pgtype.Timestamptz
+}
+
+type NotificationJob struct {
+	ID          pgtype.UUID
+	UserID      pgtype.UUID
+	Channel     string
+	Payload     []byte
+	Status      string
+	RetryCount  int32
+	NextRetryAt pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
 }
 
 type RecurringRule struct {

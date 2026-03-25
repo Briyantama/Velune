@@ -36,6 +36,8 @@ type Service struct {
 	BrokerDLX              string
 	BrokerDLQ              string
 	BrokerDLQRoutingKey    string
+	// ReconcileInterval runs periodic reconciliation when >0 (e.g. 1h, 24h). Empty/disabled by default.
+	ReconcileInterval time.Duration
 }
 
 func Load(serviceName string) (*Service, error) {
@@ -57,10 +59,19 @@ func Load(serviceName string) (*Service, error) {
 	viper.SetDefault("BROKER_DLX", "velune.events.dlx")
 	viper.SetDefault("BROKER_DLQ", "velune.events.dlq")
 	viper.SetDefault("BROKER_DLQ_ROUTING_KEY", "velune.dlq")
+	viper.SetDefault("RECONCILE_INTERVAL", "")
 
 	jwtExp, err := time.ParseDuration(viper.GetString("JWT_EXPIRY"))
 	if err != nil {
 		jwtExp = 24 * time.Hour
+	}
+
+	reconcileDur := time.Duration(0)
+	if s := viper.GetString("RECONCILE_INTERVAL"); s != "" {
+		d, err := time.ParseDuration(s)
+		if err == nil && d > 0 {
+			reconcileDur = d
+		}
 	}
 
 	c := &Service{
@@ -89,6 +100,7 @@ func Load(serviceName string) (*Service, error) {
 		BrokerDLX:              viper.GetString("BROKER_DLX"),
 		BrokerDLQ:              viper.GetString("BROKER_DLQ"),
 		BrokerDLQRoutingKey:    viper.GetString("BROKER_DLQ_ROUTING_KEY"),
+		ReconcileInterval:      reconcileDur,
 	}
 	if c.DatabaseURL == "" {
 		c.DatabaseURL = os.Getenv("DATABASE_URL")

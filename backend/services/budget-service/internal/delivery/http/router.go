@@ -7,28 +7,40 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v5/pgxpool"
+	txclient "github.com/moon-eye/velune/services/budget-service/internal/infrastructure/transactions"
 	"github.com/moon-eye/velune/services/budget-service/internal/usecase"
 	constx "github.com/moon-eye/velune/shared/constx"
 	"github.com/moon-eye/velune/shared/httpx"
+	"github.com/moon-eye/velune/shared/metrics"
 	"github.com/moon-eye/velune/shared/middlewares"
 	"go.uber.org/zap"
 )
 
 type Server struct {
-	Budgets      *usecase.BudgetService
-	Validate     *validator.Validate
-	Log          *zap.Logger
-	JWTSecret    string
-	DB           *pgxpool.Pool
+	Budgets *usecase.BudgetService
+	TxClient *txclient.Client
+	Validate *validator.Validate
+	Log      *zap.Logger
+	JWTSecret string
+	AdminInternalKey string
+	DB               *pgxpool.Pool
 }
 
 func NewRouter(s *Server) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(middlewares.RequestIDHeader)
+	r.Use(middlewares.CorrelationIDHeader)
 
 	r.Get("/health", s.health)
+	r.Handle("/metrics", metrics.Handler())
+
+	if s.AdminInternalKey != "" {
+		r.Route("/internal/admin", func(r chi.Router) {
+			r.Use(middlewares.AdminAPIKeyAuth(s.AdminInternalKey, s.Log))
+			r.Post("/reconcile/budget", s.postAdminReconcileBudget)
+		})
+	}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Group(func(r chi.Router) {

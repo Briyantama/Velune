@@ -2,60 +2,45 @@ package httpapi
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-playground/validator/v10"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/moon-eye/velune/services/legacy-api/internal/usecase"
 	constx "github.com/moon-eye/velune/shared/constx"
 	"github.com/moon-eye/velune/shared/httpx"
+	"github.com/moon-eye/velune/shared/metrics"
 	"github.com/moon-eye/velune/shared/middlewares"
-	"go.uber.org/zap"
 )
 
-type Server struct {
-	Auth         *usecase.AuthService
-	Accounts     *usecase.AccountService
-	Categories   *usecase.CategoryService
-	Transactions *usecase.TransactionService
-	Budgets      *usecase.BudgetService
-	Recurring    *usecase.RecurringService
-	Reports      *usecase.ReportService
-	Validate     *validator.Validate
-	Log          *zap.Logger
-	JWTSecret    string
-	DB           *pgxpool.Pool
-}
-
-func NewRouter(s *Server) http.Handler {
+// NewRouter serves health, Prometheus metrics, and explicit 410 responses for migrated /api/v1 paths.
+func NewRouter() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(middlewares.RequestIDHeader)
+	r.Use(middlewares.CorrelationIDHeader)
 
-	r.Get("/health", s.health)
+	r.Get("/health", health)
+	r.Handle("/metrics", metrics.Handler())
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Group(func(r chi.Router) {
-			r.Use(middlewares.JWTAuth(s.JWTSecret, s.Log))
-			r.Route("/budgets", func(r chi.Router) {
-				r.Post("/", s.createBudget)
-				r.Get("/", s.listBudgets)
-				r.Put("/{id}", s.updateBudget)
-				r.Delete("/{id}", s.deleteBudget)
-			})
-		})
+		r.NotFound(apiMigratedGone)
 	})
 	return r
 }
 
-func (s *Server) health(w http.ResponseWriter, r *http.Request) {
-	if s.DB != nil {
-		if err := s.DB.Ping(r.Context()); err != nil {
-			httpx.WriteJSON(w,constx.StatusServiceUnavailable, map[string]string{"status": "degraded", "database": "down"})
-			return
-		}
-	}
-	httpx.WriteJSON(w,constx.StatusOK, map[string]string{"status": "ok"})
+func health(w http.ResponseWriter, _ *http.Request) {
+	httpx.WriteJSON(w, constx.StatusOK, map[string]any{
+		"status":  "ok",
+		"service": "legacy-api",
+		"role":    "strangler_shell",
+	})
+}
+
+func apiMigratedGone(w http.ResponseWriter, _ *http.Request) {
+	// 410 Gone — HTTP semantic for retired resources
+	httpx.WriteJSON(w, http.StatusGone, map[string]any{
+		"code":    "ENDPOINT_MOVED",
+		"message": "Business APIs are served via api-gateway to microservices; legacy surface retired.",
+		"docs":    os.Getenv("VELOUNE_MIGRATION_DOCS_URL"),
+	})
 }

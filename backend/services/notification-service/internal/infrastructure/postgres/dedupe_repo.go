@@ -6,6 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/moon-eye/velune/shared/helper"
+	db "github.com/moon-eye/velune/shared/sqlc/generated"
 )
 
 type DedupeRepo struct{ s *Store }
@@ -13,10 +15,10 @@ type DedupeRepo struct{ s *Store }
 func NewDedupeRepo(s *Store) *DedupeRepo { return &DedupeRepo{s: s} }
 
 func (r *DedupeRepo) SeenOrMark(ctx context.Context, key string, eventID uuid.UUID) (bool, error) {
-	_, err := r.s.Pool.Exec(ctx, `
-		INSERT INTO event_dedupe (idempotency_key, event_id, processed_at)
-		VALUES ($1, $2, now())
-	`, key, eventID)
+	err := db.New(r.s.Pool).EventDedupeInsert(ctx, db.EventDedupeInsertParams{
+		IdempotencyKey: key,
+		EventID:        helper.ToPgUUID(eventID),
+	})
 	if err == nil {
 		return false, nil
 	}

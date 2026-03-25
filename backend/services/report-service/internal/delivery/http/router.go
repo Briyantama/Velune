@@ -11,6 +11,7 @@ import (
 	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/httpx"
+	"github.com/moon-eye/velune/shared/metrics"
 	"github.com/moon-eye/velune/shared/middlewares"
 	"go.uber.org/zap"
 )
@@ -26,8 +27,9 @@ func NewRouter(s *Server) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(middlewares.RequestIDHeader)
+	r.Use(middlewares.CorrelationIDHeader)
 	r.Get("/health", health)
+	r.Handle("/metrics", metrics.Handler())
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Group(func(r chi.Router) {

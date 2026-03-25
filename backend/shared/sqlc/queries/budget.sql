@@ -51,3 +51,32 @@ WHERE id = $1
   AND user_id = $2
   AND version = $3
   AND deleted_at IS NULL;
+
+-- name: BudgetAlertStateGetForUpdate :one
+SELECT last_threshold_state
+FROM budget_alert_state
+WHERE budget_id = $1
+FOR UPDATE;
+
+-- name: BudgetAlertStateUpsert :exec
+INSERT INTO budget_alert_state (budget_id, last_usage_percent, last_threshold_state, last_emitted_at, updated_at)
+VALUES ($1, $2, $3, CASE WHEN $4 THEN now() ELSE NULL END, now())
+ON CONFLICT (budget_id) DO UPDATE
+SET last_usage_percent = EXCLUDED.last_usage_percent,
+  last_threshold_state = EXCLUDED.last_threshold_state,
+  last_emitted_at = CASE WHEN $4 THEN now() ELSE budget_alert_state.last_emitted_at END,
+  updated_at = now();
+
+-- name: BudgetAlertDriftCandidates :many
+SELECT b.id,
+  b.user_id,
+  b.start_date,
+  b.end_date,
+  b.currency,
+  b.category_id,
+  b.limit_amount_minor,
+  s.last_usage_percent
+FROM budgets b
+INNER JOIN budget_alert_state s ON s.budget_id = b.id
+WHERE b.deleted_at IS NULL
+LIMIT 200;

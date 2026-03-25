@@ -70,7 +70,7 @@ func (c *Client) SummaryByCategory(ctx context.Context, userID uuid.UUID, from, 
 }
 
 func (c *Client) get(ctx context.Context, uri string, userID uuid.UUID, v any) error {
-	req, err := httpx.NewRequestWithContext(ctx, constx.MethodGet, uri, nil)
+	req, err := httpx.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 	if err != nil {
 		return err
 	}

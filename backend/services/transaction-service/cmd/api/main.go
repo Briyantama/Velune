@@ -14,14 +14,19 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/google/uuid"
 	httpapi "github.com/moon-eye/velune/services/transaction-service/internal/delivery/http"
 	"github.com/moon-eye/velune/services/transaction-service/internal/infrastructure/postgres"
+	tsrecon "github.com/moon-eye/velune/services/transaction-service/internal/reconciliation"
 	"github.com/moon-eye/velune/services/transaction-service/internal/usecase"
 	config "github.com/moon-eye/velune/shared/config"
 	"github.com/moon-eye/velune/shared/contracts"
 	"github.com/moon-eye/velune/shared/events"
+	"github.com/moon-eye/velune/shared/helper"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
+	"github.com/moon-eye/velune/shared/metrics"
+	"github.com/moon-eye/velune/shared/sim"
+	db "github.com/moon-eye/velune/shared/sqlc/generated"
+	stringx "github.com/moon-eye/velune/shared/stringx"
 	"go.uber.org/zap"
 )
 
@@ -59,7 +64,8 @@ func main() {
 	txRepo := postgres.NewTransactionRepo(store)
 	recurringRepo := postgres.NewRecurringRepo(store)
 	ledger := postgres.NewLedger(store)
-	eventPublisher, err := events.NewRabbitPublisher(cfg.BrokerURL, cfg.BrokerExchange, cfg.BrokerRoutingKey, cfg.BrokerDLX, cfg.BrokerDLQRoutingKey)
+	chaos := sim.LoadFromEnv()
+	eventPublisher, err := events.NewRabbitPublisher(cfg.BrokerURL, cfg.BrokerExchange, cfg.BrokerRoutingKey, cfg.BrokerDLX, cfg.BrokerDLQRoutingKey, chaos)
 	if err != nil {
 		log.Fatal("events", zap.Error(err))
 	}
@@ -74,6 +80,7 @@ func main() {
 		Validate:     v,
 		Log:          log,
 		JWTSecret:    cfg.JWTSecret,
+		AdminInternalKey: stringx.TrimSpace(os.Getenv("ADMIN_INTERNAL_KEY")),
 		DB:           store.Pool,
 	}
 
@@ -96,12 +103,30 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if err := dispatchOutboxBatch(ctx, store, eventPublisher, cfg.OutboxBatchSize, cfg.OutboxMaxRetry, cfg.RetryBaseDelaySeconds, log); err != nil {
-					log.Error("outbox dispatch failed", zap.Error(err))
+				if err := dispatchOutboxBatch(ctx, store, eventPublisher, "transaction-service", cfg.OutboxBatchSize, cfg.OutboxMaxRetry, cfg.RetryBaseDelaySeconds, log); err != nil {
+					log.Error("outbox dispatch failed", append(sharedlog.FieldsFromContext(ctx), zap.Error(err))...)
 				}
 			}
 		}
 	}()
+
+	if cfg.ReconcileInterval > 0 {
+		go func() {
+			ticker := time.NewTicker(cfg.ReconcileInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					rctx := context.Background()
+					if _, _, err := tsrecon.ReconcileAccountBalances(rctx, store.Pool, log); err != nil {
+						log.Error("balance_reconcile", zap.Error(err))
+					}
+				}
+			}
+		}()
+	}
 
 	go func() {
 		log.Info("server listening", zap.String("addr", addr))
@@ -125,75 +150,82 @@ func dispatchOutboxBatch(
 	ctx context.Context,
 	store *postgres.Store,
 	publisher *events.RabbitPublisher,
+	serviceName string,
 	batchSize, maxRetry, baseDelaySeconds int,
 	log *zap.Logger,
 ) error {
 	if batchSize <= 0 {
 		batchSize = 50
 	}
-	rows, err := store.Pool.Query(ctx, `
-		SELECT id, payload, retry_count
-		FROM event_outbox
-		WHERE status IN ('pending','failed')
-		  AND retry_count < $1
-		  AND next_retry_at <= now()
-		ORDER BY created_at ASC
-		LIMIT $2
-	`, maxRetry, batchSize)
+	metrics.RefreshOutboxPending(ctx, store.Pool, maxRetry)
+	q := db.New(store.Pool)
+	items, err := q.OutboxListDueForDispatch(ctx, db.OutboxListDueForDispatchParams{
+		RetryCount: int32(maxRetry),
+		Limit:      int32(batchSize),
+	})
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var id [16]byte
-		var payload []byte
-		var retryCount int
-		if err := rows.Scan(&id, &payload, &retryCount); err != nil {
-			return err
-		}
+	for _, row := range items {
+		id := row.ID
+		payload := row.Payload
+		retryCount := int(row.RetryCount)
 		var env contracts.EventEnvelope
 		if err := json.Unmarshal(payload, &env); err != nil {
-			_, _ = store.Pool.Exec(ctx, `UPDATE event_outbox SET status='failed', retry_count=retry_count+1, updated_at=now() WHERE id=$1`, id)
+			_ = q.OutboxMarkFailedBumpRetry(ctx, id)
 			continue
 		}
 		if env.EventID == (contracts.EventEnvelope{}).EventID {
-			env.EventID = uuidFromBytes(id)
+			env.EventID = helper.FromPgUUID(id)
 		}
+		outboxID := helper.FromPgUUID(id)
 		if env.Idempotency == "" {
 			env.Idempotency = "outbox:" + env.EventType + ":" + env.EventID.String()
 		}
+		log.Info("outbox_publish_attempt", append(sharedlog.FieldsFromContext(ctx),
+			zap.String("outbox_id", outboxID.String()),
+			zap.String("event_id", env.EventID.String()),
+			zap.String("event_type", env.EventType),
+			zap.Int("retry_count", retryCount),
+		)...)
 		if err := publisher.Publish(ctx, env); err != nil {
-					if retryCount+1 >= maxRetry {
-						_ = publisher.PublishDLQ(ctx, env)
-						_, _ = store.Pool.Exec(ctx, `UPDATE event_outbox SET status='failed', retry_count=retry_count+1, updated_at=now() WHERE id=$1`, id)
-						log.Error("outbox moved to dlq", zap.String("event_id", env.EventID.String()))
-						continue
-					}
-					nextRetry := time.Now().UTC().Add(time.Duration(1<<retryCount*maxInt(1, baseDelaySeconds)) * time.Second)
-			_, _ = store.Pool.Exec(ctx, `
-				UPDATE event_outbox
-				SET status='failed', retry_count=retry_count+1, next_retry_at=$2, updated_at=now()
-				WHERE id=$1
-			`, id, nextRetry)
-			log.Warn("outbox publish retry", zap.String("event_id", env.EventID.String()), zap.Int("retry_count", retryCount+1))
+			if retryCount+1 >= maxRetry {
+				_ = publisher.PublishDLQ(ctx, env)
+				metrics.DLQMessagesTotal.WithLabelValues(serviceName).Inc()
+				_ = q.OutboxMarkFailedBumpRetry(ctx, id)
+				log.Error("outbox_publish_dlq", append(sharedlog.FieldsFromContext(ctx),
+					zap.String("outbox_id", outboxID.String()),
+					zap.String("event_id", env.EventID.String()),
+					zap.String("event_type", env.EventType),
+					zap.Int("retry_count", retryCount+1),
+				)...)
+				continue
+			}
+			metrics.OutboxRetryTotal.WithLabelValues(serviceName).Inc()
+			nextRetry := time.Now().UTC().Add(time.Duration(1<<retryCount*helper.MaxInt(1, baseDelaySeconds)) * time.Second)
+			_ = q.OutboxMarkFailedScheduleRetry(ctx, db.OutboxMarkFailedScheduleRetryParams{
+				ID:          id,
+				NextRetryAt: helper.ToPgTS(nextRetry),
+			})
+			log.Warn("outbox_publish_retry_scheduled", append(sharedlog.FieldsFromContext(ctx),
+				zap.String("outbox_id", outboxID.String()),
+				zap.String("event_id", env.EventID.String()),
+				zap.String("event_type", env.EventType),
+				zap.Int("retry_count", retryCount+1),
+				zap.Time("next_retry_at", nextRetry),
+				zap.Error(err),
+			)...)
 			continue
 		}
-		_, _ = store.Pool.Exec(ctx, `UPDATE event_outbox SET status='sent', updated_at=now() WHERE id=$1`, id)
-		log.Info("outbox published", zap.String("event_id", env.EventID.String()), zap.String("event_type", env.EventType))
+		_ = q.OutboxMarkSent(ctx, id)
+		log.Info("outbox_publish_sent", append(sharedlog.FieldsFromContext(ctx),
+			zap.String("outbox_id", outboxID.String()),
+			zap.String("event_id", env.EventID.String()),
+			zap.String("event_type", env.EventType),
+		)...)
 	}
-	return rows.Err()
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func uuidFromBytes(b [16]byte) uuid.UUID {
-	return uuid.UUID(b)
+	return nil
 }
 
 func runMigrations(databaseURL, sourceURL string) error {

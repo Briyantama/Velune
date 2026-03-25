@@ -1,7 +1,9 @@
 package httpx
 
 import (
+	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -89,6 +91,22 @@ func MustUserID(r *http.Request) (uuid.UUID, error) {
 	return uid, nil
 }
 
+func singleHostReverseProxyWithTracing(u *url.URL) *httputil.ReverseProxy {
+	proxy := httputil.NewSingleHostReverseProxy(u)
+	director := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		director(req)
+		if cid, ok := CorrelationID(req.Context()); ok {
+			req.Header.Set("X-Correlation-ID", cid)
+		}
+		if rid, ok := RequestIDFromCtx(req.Context()); ok {
+			req.Header.Set("X-Request-ID", rid)
+		}
+	}
+	return proxy
+}
+
+// MustProxy returns a reverse proxy that forwards X-Correlation-ID and X-Request-ID from the inbound request context.
 func MustProxy(origin string) http.Handler {
 	u, err := url.Parse(origin)
 	if err != nil {
@@ -96,11 +114,12 @@ func MustProxy(origin string) http.Handler {
 			http.Error(w, "bad upstream URL", constx.StatusInternalServerError)
 		})
 	}
-	return httputil.NewSingleHostReverseProxy(u)
+	return singleHostReverseProxyWithTracing(u)
 }
 
+// SingleHostReverseProxy returns a proxy with correlation and request ID propagation on the outbound request.
 func SingleHostReverseProxy(primary *url.URL) *httputil.ReverseProxy {
-	return httputil.NewSingleHostReverseProxy(primary)
+	return singleHostReverseProxyWithTracing(primary)
 }
 
 func MustProxyWithFallback(primaryURL, fallbackURL string) http.Handler {
@@ -110,7 +129,17 @@ func MustProxyWithFallback(primaryURL, fallbackURL string) http.Handler {
 			http.Error(w, "bad report-service URL", constx.StatusInternalServerError)
 		})
 	}
-	primaryProxy := SingleHostReverseProxy(primary)
+	primaryProxy := httputil.NewSingleHostReverseProxy(primary)
+	d := primaryProxy.Director
+	primaryProxy.Director = func(req *http.Request) {
+		d(req)
+		if cid, ok := CorrelationID(req.Context()); ok {
+			req.Header.Set("X-Correlation-ID", cid)
+		}
+		if rid, ok := RequestIDFromCtx(req.Context()); ok {
+			req.Header.Set("X-Request-ID", rid)
+		}
+	}
 	var fallbackProxy http.Handler
 	if fallbackURL != "" {
 		fallbackProxy = MustProxy(fallbackURL)
@@ -129,4 +158,8 @@ func MustProxyWithFallback(primaryURL, fallbackURL string) http.Handler {
 		http.Error(w, "report upstream unavailable", constx.StatusBadGateway)
 	}
 	return primaryProxy
+}
+
+func NewRequestWithContext(ctx context.Context, method, url string, body io.Reader) (*http.Request, error) {
+	return http.NewRequestWithContext(ctx, method, url, body)
 }

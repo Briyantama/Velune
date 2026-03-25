@@ -2,71 +2,38 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/go-playground/validator/v10"
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/moon-eye/velune/services/legacy-api/internal/config"
 	httpx "github.com/moon-eye/velune/services/legacy-api/internal/delivery/http"
-	"github.com/moon-eye/velune/services/legacy-api/internal/infrastructure/postgres"
-	"github.com/moon-eye/velune/services/legacy-api/internal/usecase"
+	sharedconfig "github.com/moon-eye/velune/shared/config"
+	sharedlog "github.com/moon-eye/velune/shared/logger"
 	"go.uber.org/zap"
 )
 
 func main() {
-	log, err := zap.NewProduction()
+	log, err := sharedlog.New("legacy-api")
 	if err != nil {
 		panic(err)
 	}
 	defer log.Sync()
 
-	cfg, err := config.Load()
+	cfg, err := sharedconfig.Load("legacy-api")
 	if err != nil {
 		log.Fatal("config", zap.Error(err))
 	}
-	if cfg.DatabaseURL == "" {
-		log.Fatal("DATABASE_URL is required")
-	}
-	if cfg.JWTSecret == "" {
-		log.Fatal("JWT_SECRET is required")
-	}
 
-	ctx := context.Background()
-	if err := runMigrations(cfg.DatabaseURL, cfg.MigrationsPath); err != nil {
-		log.Fatal("migrations", zap.Error(err))
+	addr := cfg.HTTPHost + ":" + cfg.HTTPPort
+	if cfg.HTTPPort == "" {
+		addr = "0.0.0.0:8090"
 	}
 
-	store, err := postgres.NewStore(ctx, cfg.DatabaseURL)
-	if err != nil {
-		log.Fatal("database", zap.Error(err))
-	}
-	defer store.Close()
-
-	budgetRepo := postgres.NewBudgetRepo(store)
-	categoryRepo := postgres.NewCategoryRepo(store)
-	txRepo := postgres.NewTransactionRepo(store)
-
-	v := validator.New()
-	srv := &httpx.Server{
-		Budgets:     &usecase.BudgetService{Budgets: budgetRepo, Categories: categoryRepo, Transactions: txRepo},
-		Validate:  v,
-		Log:       log,
-		JWTSecret: cfg.JWTSecret,
-		DB:        store.Pool,
-	}
-
-	handler := httpx.NewRouter(srv)
-	addr := ":" + cfg.HTTPPort
 	httpServer := &http.Server{
 		Addr:              addr,
-		Handler:           handler,
+		Handler:           httpx.NewRouter(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -74,7 +41,7 @@ func main() {
 	}
 
 	go func() {
-		log.Info("server listening", zap.String("addr", addr))
+		log.Info("legacy-api shell listening", zap.String("addr", addr))
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal("listen", zap.Error(err))
 		}
@@ -89,16 +56,4 @@ func main() {
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		log.Error("shutdown", zap.Error(err))
 	}
-}
-
-func runMigrations(databaseURL, sourceURL string) error {
-	m, err := migrate.New(sourceURL, databaseURL)
-	if err != nil {
-		return fmt.Errorf("migrate new: %w", err)
-	}
-	defer m.Close()
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("migrate up: %w", err)
-	}
-	return nil
 }

@@ -11,6 +11,33 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const outboxCountPendingOrFailed = `-- name: OutboxCountPendingOrFailed :one
+SELECT COUNT(*)::int
+FROM event_outbox
+WHERE status IN ('pending', 'failed')
+`
+
+func (q *Queries) OutboxCountPendingOrFailed(ctx context.Context) (int32, error) {
+	row := q.db.QueryRow(ctx, outboxCountPendingOrFailed)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const outboxCountRetryEligible = `-- name: OutboxCountRetryEligible :one
+SELECT COUNT(*)::bigint
+FROM event_outbox
+WHERE status IN ('pending', 'failed')
+  AND retry_count < $1
+`
+
+func (q *Queries) OutboxCountRetryEligible(ctx context.Context, retryCount int32) (int64, error) {
+	row := q.db.QueryRow(ctx, outboxCountRetryEligible, retryCount)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const outboxInsert = `-- name: OutboxInsert :exec
 INSERT INTO event_outbox (id, event_type, payload, status, retry_count, next_retry_at, created_at, updated_at)
 VALUES ($1, $2, $3, 'pending', 0, now(), now(), now())
@@ -27,6 +54,134 @@ func (q *Queries) OutboxInsert(ctx context.Context, arg OutboxInsertParams) erro
 	return err
 }
 
+const outboxListAdmin = `-- name: OutboxListAdmin :many
+SELECT id::text,
+  event_type,
+  status,
+  retry_count,
+  next_retry_at,
+  created_at,
+  CASE
+    WHEN length(payload::text) > 512 THEN left(payload::text, 512) || '...'
+    ELSE payload::text
+  END AS payload_preview
+FROM event_outbox
+WHERE ($1::text = '' OR status = $1)
+ORDER BY created_at DESC
+LIMIT $2
+`
+
+type OutboxListAdminParams struct {
+	Column1 string
+	Limit   int32
+}
+
+type OutboxListAdminRow struct {
+	ID             string
+	EventType      string
+	Status         string
+	RetryCount     int32
+	NextRetryAt    pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+	PayloadPreview string
+}
+
+func (q *Queries) OutboxListAdmin(ctx context.Context, arg OutboxListAdminParams) ([]OutboxListAdminRow, error) {
+	rows, err := q.db.Query(ctx, outboxListAdmin, arg.Column1, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OutboxListAdminRow
+	for rows.Next() {
+		var i OutboxListAdminRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.EventType,
+			&i.Status,
+			&i.RetryCount,
+			&i.NextRetryAt,
+			&i.CreatedAt,
+			&i.PayloadPreview,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const outboxListDueForDispatch = `-- name: OutboxListDueForDispatch :many
+SELECT id, payload, retry_count
+FROM event_outbox
+WHERE status IN ('pending', 'failed')
+  AND retry_count < $1
+  AND next_retry_at <= now()
+ORDER BY created_at ASC
+LIMIT $2
+`
+
+type OutboxListDueForDispatchParams struct {
+	RetryCount int32
+	Limit      int32
+}
+
+type OutboxListDueForDispatchRow struct {
+	ID         pgtype.UUID
+	Payload    []byte
+	RetryCount int32
+}
+
+func (q *Queries) OutboxListDueForDispatch(ctx context.Context, arg OutboxListDueForDispatchParams) ([]OutboxListDueForDispatchRow, error) {
+	rows, err := q.db.Query(ctx, outboxListDueForDispatch, arg.RetryCount, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OutboxListDueForDispatchRow
+	for rows.Next() {
+		var i OutboxListDueForDispatchRow
+		if err := rows.Scan(&i.ID, &i.Payload, &i.RetryCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const outboxMarkFailedBumpRetry = `-- name: OutboxMarkFailedBumpRetry :exec
+UPDATE event_outbox
+SET status = 'failed', retry_count = retry_count + 1, updated_at = now()
+WHERE id = $1
+`
+
+func (q *Queries) OutboxMarkFailedBumpRetry(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, outboxMarkFailedBumpRetry, id)
+	return err
+}
+
+const outboxMarkFailedScheduleRetry = `-- name: OutboxMarkFailedScheduleRetry :exec
+UPDATE event_outbox
+SET status = 'failed', retry_count = retry_count + 1, next_retry_at = $2, updated_at = now()
+WHERE id = $1
+`
+
+type OutboxMarkFailedScheduleRetryParams struct {
+	ID          pgtype.UUID
+	NextRetryAt pgtype.Timestamptz
+}
+
+func (q *Queries) OutboxMarkFailedScheduleRetry(ctx context.Context, arg OutboxMarkFailedScheduleRetryParams) error {
+	_, err := q.db.Exec(ctx, outboxMarkFailedScheduleRetry, arg.ID, arg.NextRetryAt)
+	return err
+}
+
 const outboxMarkSent = `-- name: OutboxMarkSent :exec
 UPDATE event_outbox
 SET status = 'sent', updated_at = now()
@@ -36,4 +191,55 @@ WHERE id = $1
 func (q *Queries) OutboxMarkSent(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, outboxMarkSent, id)
 	return err
+}
+
+const outboxPayloadsForReplay = `-- name: OutboxPayloadsForReplay :many
+SELECT payload::text
+FROM event_outbox
+WHERE created_at >= $1
+  AND created_at < $2
+  AND status IN ('pending', 'failed')
+  AND ($3::text = '' OR event_type = $3)
+ORDER BY created_at ASC
+LIMIT 100
+`
+
+type OutboxPayloadsForReplayParams struct {
+	CreatedAt   pgtype.Timestamptz
+	CreatedAt_2 pgtype.Timestamptz
+	Column3     string
+}
+
+func (q *Queries) OutboxPayloadsForReplay(ctx context.Context, arg OutboxPayloadsForReplayParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, outboxPayloadsForReplay, arg.CreatedAt, arg.CreatedAt_2, arg.Column3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var payload string
+		if err := rows.Scan(&payload); err != nil {
+			return nil, err
+		}
+		items = append(items, payload)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const outboxRetryReset = `-- name: OutboxRetryReset :execrows
+UPDATE event_outbox
+SET status = 'pending', next_retry_at = now(), updated_at = now()
+WHERE id = $1
+`
+
+func (q *Queries) OutboxRetryReset(ctx context.Context, id pgtype.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, outboxRetryReset, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

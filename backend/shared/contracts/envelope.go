@@ -34,12 +34,13 @@ type MoneyAmount struct {
 
 // EventEnvelope is the shared broker message envelope across services.
 type EventEnvelope struct {
-	EventID     uuid.UUID       `json:"eventId"`
-	EventType   string          `json:"eventType"`
-	Version     string          `json:"version,omitempty"`
-	Source      string          `json:"source"`
-	OccurredAt  time.Time       `json:"occurredAt"`
-	UserID      *uuid.UUID      `json:"userId,omitempty"`
-	Idempotency string          `json:"idempotencyKey,omitempty"`
-	Payload     json.RawMessage `json:"payload"`
+	EventID        uuid.UUID       `json:"eventId"`
+	EventType      string          `json:"eventType"`
+	Version        string          `json:"version,omitempty"`
+	Source         string          `json:"source"`
+	OccurredAt     time.Time       `json:"occurredAt"`
+	UserID         *uuid.UUID      `json:"userId,omitempty"`
+	Idempotency    string          `json:"idempotencyKey,omitempty"`
+	CorrelationID  string          `json:"correlationId,omitempty"`
+	Payload        json.RawMessage `json:"payload"`
 }

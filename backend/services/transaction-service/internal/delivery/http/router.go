@@ -10,6 +10,7 @@ import (
 	"github.com/moon-eye/velune/services/transaction-service/internal/usecase"
 	"github.com/moon-eye/velune/shared/constx"
 	"github.com/moon-eye/velune/shared/httpx"
+	"github.com/moon-eye/velune/shared/metrics"
 	"github.com/moon-eye/velune/shared/middlewares"
 	"go.uber.org/zap"
 )
@@ -22,16 +23,26 @@ type Server struct {
 	Validate     *validator.Validate
 	Log          *zap.Logger
 	JWTSecret    string
-	DB           *pgxpool.Pool
+	// AdminInternalKey enables POST /internal/admin/* when non-empty (must match admin-service ADMIN_INTERNAL_KEY).
+	AdminInternalKey string
+	DB               *pgxpool.Pool
 }
 
 func NewRouter(s *Server) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(middlewares.RequestIDHeader)
+	r.Use(middlewares.CorrelationIDHeader)
 
 	r.Get("/health", s.health)
+	r.Handle("/metrics", metrics.Handler())
+
+	if s.AdminInternalKey != "" {
+		r.Route("/internal/admin", func(r chi.Router) {
+			r.Use(middlewares.AdminAPIKeyAuth(s.AdminInternalKey, s.Log))
+			r.Post("/reconcile/balance", s.postAdminReconcileBalance)
+		})
+	}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Group(func(r chi.Router) {

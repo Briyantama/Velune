@@ -21,6 +21,8 @@ import (
 	sharedconfig "github.com/moon-eye/velune/shared/config"
 	"github.com/moon-eye/velune/shared/helper"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
+	"github.com/moon-eye/velune/shared/metrics"
+	"github.com/moon-eye/velune/shared/middlewares"
 	"go.uber.org/zap"
 )
 
@@ -70,8 +72,10 @@ func main() {
 	handler := httpapi.NewRouter(server)
 
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID, middleware.RealIP, middleware.Recoverer)
+	r.Use(middlewares.CorrelationIDHeader)
+	r.Use(middleware.RealIP, middleware.Recoverer)
 	r.Get("/health", health())
+	r.Handle("/metrics", metrics.Handler())
 	r.Mount("/", handler)
 
 	addr := cfg.HTTPHost + ":" + cfg.HTTPPort

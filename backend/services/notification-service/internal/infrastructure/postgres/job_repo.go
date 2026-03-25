@@ -6,6 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/notification-service/internal/repository"
+	"github.com/moon-eye/velune/shared/helper"
+	db "github.com/moon-eye/velune/shared/sqlc/generated"
 )
 
 type JobRepo struct{ s *Store }
@@ -13,51 +15,48 @@ type JobRepo struct{ s *Store }
 func NewJobRepo(s *Store) *JobRepo { return &JobRepo{s: s} }
 
 func (r *JobRepo) Enqueue(ctx context.Context, job *repository.NotificationJob) error {
-	_, err := r.s.Pool.Exec(ctx, `
-		INSERT INTO notification_jobs (id, user_id, channel, payload, status, retry_count, next_retry_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, 'pending', 0, now(), now(), now())
-	`, job.ID, job.UserID, job.Channel, job.Payload)
-	return err
+	q := db.New(r.s.Pool)
+	return q.NotificationJobEnqueue(ctx, db.NotificationJobEnqueueParams{
+		ID:      helper.ToPgUUID(job.ID),
+		UserID:  helper.ToPgUUID(job.UserID),
+		Channel: job.Channel,
+		Payload: job.Payload,
+	})
 }
 
 func (r *JobRepo) FetchDue(ctx context.Context, limit int) ([]repository.NotificationJob, error) {
-	rows, err := r.s.Pool.Query(ctx, `
-		SELECT id, user_id, channel, payload, status, retry_count, next_retry_at
-		FROM notification_jobs
-		WHERE status IN ('pending','processing') AND next_retry_at <= now()
-		ORDER BY created_at ASC
-		LIMIT $1
-	`, limit)
+	q := db.New(r.s.Pool)
+	rows, err := q.NotificationJobsFetchDue(ctx, int32(limit))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := make([]repository.NotificationJob, 0, limit)
-	for rows.Next() {
-		var j repository.NotificationJob
-		if err := rows.Scan(&j.ID, &j.UserID, &j.Channel, &j.Payload, &j.Status, &j.RetryCount, &j.NextRetryAt); err != nil {
-			return nil, err
-		}
-		out = append(out, j)
+	out := make([]repository.NotificationJob, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, repository.NotificationJob{
+			ID:          helper.FromPgUUID(row.ID),
+			UserID:      helper.FromPgUUID(row.UserID),
+			Channel:     row.Channel,
+			Payload:     row.Payload,
+			Status:      row.Status,
+			RetryCount:  int(row.RetryCount),
+			NextRetryAt: row.NextRetryAt.Time,
+		})
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (r *JobRepo) MarkSent(ctx context.Context, id uuid.UUID) error {
-	_, err := r.s.Pool.Exec(ctx, `UPDATE notification_jobs SET status='sent', updated_at=now() WHERE id=$1`, id)
-	return err
+	return db.New(r.s.Pool).NotificationJobMarkSent(ctx, helper.ToPgUUID(id))
 }
 
 func (r *JobRepo) MarkRetry(ctx context.Context, id uuid.UUID, retryCount int, nextRetryAt time.Time) error {
-	_, err := r.s.Pool.Exec(ctx, `
-		UPDATE notification_jobs
-		SET status='processing', retry_count=$2, next_retry_at=$3, updated_at=now()
-		WHERE id=$1
-	`, id, retryCount, nextRetryAt)
-	return err
+	return db.New(r.s.Pool).NotificationJobMarkRetry(ctx, db.NotificationJobMarkRetryParams{
+		ID:          helper.ToPgUUID(id),
+		RetryCount:  int32(retryCount),
+		NextRetryAt: helper.ToPgTS(nextRetryAt),
+	})
 }
 
 func (r *JobRepo) MarkFailed(ctx context.Context, id uuid.UUID) error {
-	_, err := r.s.Pool.Exec(ctx, `UPDATE notification_jobs SET status='failed', updated_at=now() WHERE id=$1`, id)
-	return err
+	return db.New(r.s.Pool).NotificationJobMarkFailed(ctx, helper.ToPgUUID(id))
 }

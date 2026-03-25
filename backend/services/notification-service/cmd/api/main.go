@@ -21,6 +21,8 @@ import (
 	"github.com/moon-eye/velune/services/notification-service/internal/usecase"
 	config "github.com/moon-eye/velune/shared/config"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
+	"github.com/moon-eye/velune/shared/metrics"
+	"github.com/moon-eye/velune/shared/sim"
 	"go.uber.org/zap"
 )
 
@@ -51,6 +53,7 @@ func main() {
 	}
 	defer store.Close()
 
+	chaos := sim.LoadFromEnv()
 	rmq, err := broker.New(
 		cfg.BrokerURL,
 		cfg.BrokerExchange,
@@ -59,25 +62,34 @@ func main() {
 		cfg.BrokerDLX,
 		cfg.BrokerDLQ,
 		cfg.BrokerDLQRoutingKey,
+		chaos,
+		log,
 	)
 	if err != nil {
 		log.Fatal("broker", zap.Error(err))
 	}
 	defer rmq.Close()
 
+	emailStub := &email.StubSender{Log: log, From: cfg.EmailFrom}
 	overspend := &usecase.OverspendService{
 		Dedupe:    postgres.NewDedupeRepo(store),
 		Jobs:      postgres.NewJobRepo(store),
 		InApp:     &delivery.InAppChannel{Log: log},
-		Email:     &email.StubSender{Log: log, From: cfg.EmailFrom},
+		Email:     &email.ChaosSender{Inner: emailStub, Sim: chaos, Log: log},
 		Publisher: rmq,
 		MaxRetry:  cfg.OutboxMaxRetry,
 		BaseDelay: time.Duration(cfg.RetryBaseDelaySeconds) * time.Second,
+		Log:       log,
+	}
+
+	if chaos.DLQSnoop {
+		rmq.RunDLQSnoop(context.Background(), log)
 	}
 
 	go func() {
-		if err := rmq.Consume(context.Background(), overspend.HandleEnvelope); err != nil {
-			log.Error("consumer stopped", zap.Error(err))
+		log.Info("rabbit_consumer_started", zap.String("queue", cfg.BrokerQueue))
+		if err := rmq.Consume(context.Background(), overspend.HandleEnvelope); err != nil && err != context.Canceled {
+			log.Error("consumer_stopped", zap.Error(err))
 		}
 	}()
 	go jobWorker(context.Background(), overspend, postgres.NewJobRepo(store), cfg.OutboxBatchSize, cfg.OutboxMaxRetry, log)
@@ -140,16 +152,28 @@ func jobWorker(ctx context.Context, svc *usecase.OverspendService, jobs reposito
 					retry := j.RetryCount + 1
 					if retry >= maxRetry {
 						_ = jobs.MarkFailed(ctx, j.ID)
-						log.Error("job failed max retries", zap.String("job_id", j.ID.String()))
+						metrics.NotificationFailedTotal.Inc()
+						log.Error("job_failed_max_retries",
+							zap.String("job_id", j.ID.String()),
+							zap.String("channel", j.Channel),
+							zap.Int("retry_count", retry),
+						)
 						continue
 					}
+					metrics.NotificationRetryTotal.Inc()
 					next := time.Now().UTC().Add(svc.Backoff(j.RetryCount))
 					_ = jobs.MarkRetry(ctx, j.ID, retry, next)
-					log.Warn("job retry scheduled", zap.String("job_id", j.ID.String()), zap.Int("retry", retry))
+					log.Warn("job_retry_scheduled",
+						zap.String("job_id", j.ID.String()),
+						zap.Int("retry_count", retry),
+						zap.Time("next_retry_at", next),
+						zap.String("channel", j.Channel),
+					)
 					continue
 				}
 				_ = jobs.MarkSent(ctx, j.ID)
-				log.Info("job sent", zap.String("job_id", j.ID.String()), zap.String("channel", j.Channel))
+				metrics.NotificationSentTotal.Inc()
+				log.Info("job_sent", zap.String("job_id", j.ID.String()), zap.String("channel", j.Channel))
 			}
 		}
 	}
