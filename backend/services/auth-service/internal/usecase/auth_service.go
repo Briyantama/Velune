@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"net/http"
 	"os"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/moon-eye/velune/services/auth-service/internal/domain"
 	"github.com/moon-eye/velune/services/auth-service/internal/repository"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/jwt"
 	"github.com/moon-eye/velune/shared/stringx"
@@ -58,11 +58,11 @@ type MeResponse struct {
 func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*TokenResponse, error) {
 	email := normalizeEmail(in.Email)
 	if email == "" || in.Password == "" {
-		return nil, errs.New("AUTH_VALIDATION_ERROR", "email and password are required", http.StatusBadRequest)
+		return nil, errs.New("AUTH_VALIDATION_ERROR", "email and password are required",constx.StatusBadRequest)
 	}
 
 	if s.Users == nil || s.RefreshTokens == nil {
-		return nil, errs.New("AUTH_INTERNAL_ERROR", "auth service not wired", http.StatusInternalServerError)
+		return nil, errs.New("AUTH_INTERNAL_ERROR", "auth service not wired",constx.StatusInternalServerError)
 	}
 
 	existing, err := s.Users.GetByEmail(ctx, email)
@@ -70,7 +70,7 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*TokenRes
 		return nil, err
 	}
 	if existing != nil {
-		return nil, errs.New("AUTH_EMAIL_TAKEN", "email already registered", http.StatusConflict)
+		return nil, errs.New("AUTH_EMAIL_TAKEN", "email already registered",constx.StatusConflict)
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
@@ -96,7 +96,7 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*TokenRes
 	if err := s.Users.Create(ctx, u); err != nil {
 		// Handle rare race where email becomes taken between GetByEmail and Create.
 		if isUniqueViolation(err) {
-			return nil, errs.New("AUTH_EMAIL_TAKEN", "email already registered", http.StatusConflict)
+			return nil, errs.New("AUTH_EMAIL_TAKEN", "email already registered",constx.StatusConflict)
 		}
 		return nil, err
 	}
@@ -107,17 +107,17 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*TokenRes
 func (s *AuthService) Login(ctx context.Context, in LoginInput) (*TokenResponse, error) {
 	email := normalizeEmail(in.Email)
 	if email == "" || in.Password == "" {
-		return nil, errs.New("AUTH_VALIDATION_ERROR", "email and password are required", http.StatusBadRequest)
+		return nil, errs.New("AUTH_VALIDATION_ERROR", "email and password are required",constx.StatusBadRequest)
 	}
 	u, err := s.Users.GetByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
 	if u == nil {
-		return nil, errs.New("AUTH_INVALID_CREDENTIALS", "invalid credentials", http.StatusUnauthorized)
+		return nil, errs.New("AUTH_INVALID_CREDENTIALS", "invalid credentials",constx.StatusUnauthorized)
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(in.Password)); err != nil {
-		return nil, errs.New("AUTH_INVALID_CREDENTIALS", "invalid credentials", http.StatusUnauthorized)
+		return nil, errs.New("AUTH_INVALID_CREDENTIALS", "invalid credentials",constx.StatusUnauthorized)
 	}
 	return s.issueTokens(ctx, u.ID, u.Email)
 }
@@ -125,10 +125,10 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*TokenResponse,
 func (s *AuthService) Refresh(ctx context.Context, in RefreshInput) (*TokenResponse, error) {
 	rt := stringx.TrimSpace(in.RefreshToken)
 	if rt == "" {
-		return nil, errs.New("AUTH_INVALID_REFRESH_TOKEN", "invalid refresh token", http.StatusUnauthorized)
+		return nil, errs.New("AUTH_INVALID_REFRESH_TOKEN", "invalid refresh token",constx.StatusUnauthorized)
 	}
 	if s.RefreshTokens == nil {
-		return nil, errs.New("AUTH_INTERNAL_ERROR", "auth service not wired", http.StatusInternalServerError)
+		return nil, errs.New("AUTH_INTERNAL_ERROR", "auth service not wired",constx.StatusInternalServerError)
 	}
 
 	tokenHash := hashToken(rt)
@@ -137,7 +137,7 @@ func (s *AuthService) Refresh(ctx context.Context, in RefreshInput) (*TokenRespo
 		return nil, err
 	}
 	if existing == nil {
-		return nil, errs.New("AUTH_INVALID_REFRESH_TOKEN", "invalid refresh token", http.StatusUnauthorized)
+		return nil, errs.New("AUTH_INVALID_REFRESH_TOKEN", "invalid refresh token",constx.StatusUnauthorized)
 	}
 
 	// Rotate refresh token in-place (old token becomes invalid immediately).
@@ -149,7 +149,7 @@ func (s *AuthService) Refresh(ctx context.Context, in RefreshInput) (*TokenRespo
 	newExpires := time.Now().UTC().Add(s.refreshTTL())
 	if err := s.RefreshTokens.Rotate(ctx, existing.ID, newHash, newExpires); err != nil {
 		if errors.Is(err, errs.ErrRefreshToken) {
-			return nil, errs.New("AUTH_INVALID_REFRESH_TOKEN", "invalid refresh token", http.StatusUnauthorized)
+			return nil, errs.New("AUTH_INVALID_REFRESH_TOKEN", "invalid refresh token",constx.StatusUnauthorized)
 		}
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (s *AuthService) Refresh(ctx context.Context, in RefreshInput) (*TokenRespo
 		return nil, err
 	}
 	if user == nil {
-		return nil, errs.New("AUTH_INVALID_REFRESH_TOKEN", "invalid refresh token", http.StatusUnauthorized)
+		return nil, errs.New("AUTH_INVALID_REFRESH_TOKEN", "invalid refresh token",constx.StatusUnauthorized)
 	}
 	accessResp, err := s.issueAccessToken(user.ID, user.Email)
 	if err != nil {
@@ -185,14 +185,14 @@ func (s *AuthService) Me(ctx context.Context, accessToken string) (*MeResponse, 
 func (s *AuthService) ValidateAccessToken(ctx context.Context, accessToken string) (*domain.User, error) {
 	claims, err := jwt.Parse(accessToken, s.JWTSecret)
 	if err != nil {
-		return nil, errs.New("AUTH_UNAUTHORIZED", "unauthorized", http.StatusUnauthorized)
+		return nil, errs.New("AUTH_UNAUTHORIZED", "unauthorized",constx.StatusUnauthorized)
 	}
 	user, err := s.Users.GetByID(ctx, claims.UserID)
 	if err != nil {
 		return nil, err
 	}
 	if user == nil {
-		return nil, errs.New("AUTH_UNAUTHORIZED", "unauthorized", http.StatusUnauthorized)
+		return nil, errs.New("AUTH_UNAUTHORIZED", "unauthorized",constx.StatusUnauthorized)
 	}
 	return user, nil
 }

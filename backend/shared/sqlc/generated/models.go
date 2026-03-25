@@ -37,6 +37,14 @@ type Budget struct {
 	DeletedAt        pgtype.Timestamptz
 }
 
+type BudgetAlertState struct {
+	BudgetID           pgtype.UUID
+	LastUsagePercent   float64
+	LastThresholdState string
+	LastEmittedAt      pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
 type Category struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID
@@ -57,6 +65,17 @@ type ChangeEvent struct {
 	Version    int64
 	Payload    []byte
 	CreatedAt  pgtype.Timestamptz
+}
+
+type EventOutbox struct {
+	ID          pgtype.UUID
+	EventType   string
+	Payload     []byte
+	Status      string
+	RetryCount  int32
+	NextRetryAt pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
 }
 
 type LedgerEntry struct {

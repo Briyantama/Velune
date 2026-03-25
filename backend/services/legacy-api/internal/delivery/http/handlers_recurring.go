@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/legacy-api/internal/usecase"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/httpx"
 )
@@ -50,7 +51,7 @@ func (s *Server) createRecurring(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, rr)
+	httpx.WriteJSON(w,constx.StatusCreated, rr)
 }
 
 func (s *Server) listRecurring(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +67,7 @@ func (s *Server) listRecurring(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
+	httpx.WriteJSON(w,constx.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
 }
 
 func (s *Server) deleteRecurring(w http.ResponseWriter, r *http.Request) {
@@ -82,12 +83,12 @@ func (s *Server) deleteRecurring(w http.ResponseWriter, r *http.Request) {
 	}
 	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required",constx.StatusBadRequest))
 		return
 	}
 	if err := s.Recurring.Delete(r.Context(), uid, id, v); err != nil {
 		httpx.WriteError(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	w.WriteHeader(constx.StatusNoContent)
 }

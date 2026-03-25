@@ -3,12 +3,12 @@ package usecase
 import (
 	"context"
 	"errors"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/transaction-service/internal/domain"
 	"github.com/moon-eye/velune/services/transaction-service/internal/repository"
+	"github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/pagination"
 	"github.com/moon-eye/velune/shared/stringx"
@@ -30,7 +30,7 @@ func (s *CategoryService) Create(ctx context.Context, userID uuid.UUID, in Creat
 			return nil, err
 		}
 		if p == nil {
-			return nil, errs.New("NOT_FOUND", "parent category not found", http.StatusNotFound)
+			return nil, errs.New("NOT_FOUND", "parent category not found", constx.StatusNotFound)
 		}
 	}
 	now := time.Now().UTC()
@@ -68,7 +68,7 @@ func (s *CategoryService) Update(ctx context.Context, userID, id uuid.UUID, vers
 		return nil, errs.ErrNotFound
 	}
 	if in.ParentID != nil && *in.ParentID == id {
-		return nil, errs.New("VALIDATION_ERROR", "category cannot be its own parent", http.StatusBadRequest)
+		return nil, errs.New("VALIDATION_ERROR", "category cannot be its own parent", constx.StatusBadRequest)
 	}
 	now := time.Now().UTC()
 	c.Name = stringx.TrimSpace(in.Name)
@@ -77,7 +77,7 @@ func (s *CategoryService) Update(ctx context.Context, userID, id uuid.UUID, vers
 	c.UpdatedAt = now
 	if err := s.Categories.Update(ctx, c); err != nil {
 		if errors.Is(err, repository.ErrOptimisticLock) {
-			return nil, errs.New("CONFLICT", "version conflict", http.StatusConflict)
+			return nil, errs.New("CONFLICT", "version conflict", constx.StatusConflict)
 		}
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (s *CategoryService) Update(ctx context.Context, userID, id uuid.UUID, vers
 func (s *CategoryService) Delete(ctx context.Context, userID, id uuid.UUID, version int64) error {
 	err := s.Categories.SoftDelete(ctx, userID, id, version)
 	if errors.Is(err, repository.ErrOptimisticLock) {
-		return errs.New("CONFLICT", "version conflict", http.StatusConflict)
+		return errs.New("CONFLICT", "version conflict", constx.StatusConflict)
 	}
 	return err
 }

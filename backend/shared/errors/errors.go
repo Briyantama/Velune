@@ -1,6 +1,6 @@
 package errs
 
-import "net/http"
+import "github.com/moon-eye/velune/shared/constx"
 
 // AppError is returned to clients as JSON: {"code":"...","message":"..."}.
 type AppError struct {
@@ -21,14 +21,14 @@ func New(code, message string, status int) *AppError {
 }
 
 var (
-	ErrUnauthorized = New("UNAUTHORIZED", "unauthorized", http.StatusUnauthorized)
-	ErrForbidden    = New("FORBIDDEN", "forbidden", http.StatusForbidden)
-	ErrNotFound     = New("NOT_FOUND", "not found", http.StatusNotFound)
-	ErrValidation   = New("VALIDATION_ERROR", "validation failed", http.StatusBadRequest)
-	ErrConflict     = New("CONFLICT", "conflict", http.StatusConflict)
-	ErrRefreshToken = New("REFRESH_TOKEN_ERROR", "refresh token error", http.StatusUnauthorized)
-	ErrInsufficient = New("BALANCE_ERROR", "insufficient balance", http.StatusUnprocessableEntity)
-	ErrInternal     = New("INTERNAL_ERROR", "internal server error", http.StatusInternalServerError)
+	ErrUnauthorized = New("UNAUTHORIZED", "unauthorized", constx.StatusUnauthorized)
+	ErrForbidden    = New("FORBIDDEN", "forbidden", constx.StatusForbidden)
+	ErrNotFound     = New("NOT_FOUND", "not found", constx.StatusNotFound)
+	ErrValidation   = New("VALIDATION_ERROR", "validation failed", constx.StatusBadRequest)
+	ErrConflict     = New("CONFLICT", "conflict", constx.StatusConflict)
+	ErrRefreshToken = New("REFRESH_TOKEN_ERROR", "refresh token error", constx.StatusUnauthorized)
+	ErrInsufficient = New("BALANCE_ERROR", "insufficient balance", constx.StatusUnprocessableEntity)
+	ErrInternal     = New("INTERNAL_ERROR", "internal server error", constx.StatusInternalServerError)
 )
 
 func Wrap(err error, code, message string, status int) *AppError {

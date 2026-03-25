@@ -19,12 +19,23 @@ type Service struct {
 	JWTSecret      string
 	JWTExpiry      time.Duration
 	// Downstream URLs for clients (report-service, gateway, etc.) — never hardcode in code paths.
-	AuthServiceURL        string
-	TransactionServiceURL string
-	CategoryServiceURL    string
-	BudgetServiceURL      string
-	ReportServiceURL      string
+	AuthServiceURL         string
+	TransactionServiceURL  string
+	CategoryServiceURL     string
+	BudgetServiceURL       string
+	ReportServiceURL       string
 	NotificationServiceURL string
+	BrokerURL              string
+	BrokerExchange         string
+	BrokerQueue            string
+	BrokerRoutingKey       string
+	EmailFrom              string
+	OutboxBatchSize        int
+	OutboxMaxRetry         int
+	RetryBaseDelaySeconds  int
+	BrokerDLX              string
+	BrokerDLQ              string
+	BrokerDLQRoutingKey    string
 }
 
 func Load(serviceName string) (*Service, error) {
@@ -35,6 +46,17 @@ func Load(serviceName string) (*Service, error) {
 	viper.SetDefault("JWT_EXPIRY", "24h")
 	viper.SetDefault("MIGRATIONS_PATH", "file://migrations")
 	viper.SetDefault("ENV", "development")
+	viper.SetDefault("BROKER_URL", "amqp://guest:guest@localhost:5672/")
+	viper.SetDefault("BROKER_EXCHANGE", "velune.events")
+	viper.SetDefault("BROKER_QUEUE", "notification.overspend")
+	viper.SetDefault("BROKER_ROUTING_KEY", "notification.overspend.requested")
+	viper.SetDefault("EMAIL_FROM", "noreply@velune.local")
+	viper.SetDefault("OUTBOX_BATCH_SIZE", 50)
+	viper.SetDefault("OUTBOX_MAX_RETRY", 7)
+	viper.SetDefault("RETRY_BASE_DELAY_SECONDS", 2)
+	viper.SetDefault("BROKER_DLX", "velune.events.dlx")
+	viper.SetDefault("BROKER_DLQ", "velune.events.dlq")
+	viper.SetDefault("BROKER_DLQ_ROUTING_KEY", "velune.dlq")
 
 	jwtExp, err := time.ParseDuration(viper.GetString("JWT_EXPIRY"))
 	if err != nil {
@@ -56,6 +78,17 @@ func Load(serviceName string) (*Service, error) {
 		BudgetServiceURL:       viper.GetString("BUDGET_SERVICE_URL"),
 		ReportServiceURL:       viper.GetString("REPORT_SERVICE_URL"),
 		NotificationServiceURL: viper.GetString("NOTIFICATION_SERVICE_URL"),
+		BrokerURL:              viper.GetString("BROKER_URL"),
+		BrokerExchange:         viper.GetString("BROKER_EXCHANGE"),
+		BrokerQueue:            viper.GetString("BROKER_QUEUE"),
+		BrokerRoutingKey:       viper.GetString("BROKER_ROUTING_KEY"),
+		EmailFrom:              viper.GetString("EMAIL_FROM"),
+		OutboxBatchSize:        viper.GetInt("OUTBOX_BATCH_SIZE"),
+		OutboxMaxRetry:         viper.GetInt("OUTBOX_MAX_RETRY"),
+		RetryBaseDelaySeconds:  viper.GetInt("RETRY_BASE_DELAY_SECONDS"),
+		BrokerDLX:              viper.GetString("BROKER_DLX"),
+		BrokerDLQ:              viper.GetString("BROKER_DLQ"),
+		BrokerDLQRoutingKey:    viper.GetString("BROKER_DLQ_ROUTING_KEY"),
 	}
 	if c.DatabaseURL == "" {
 		c.DatabaseURL = os.Getenv("DATABASE_URL")

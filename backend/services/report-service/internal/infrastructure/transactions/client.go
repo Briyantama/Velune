@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/moon-eye/velune/shared/contracts"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 )
 
@@ -42,11 +43,11 @@ func (c *Client) SummaryByCategory(ctx context.Context, userID string, q contrac
 
 func (c *Client) getJSON(ctx context.Context, userID, path string, q contracts.TransactionAnalyticsQuery, out any) error {
 	if c.BaseURL == "" {
-		return errs.New("UPSTREAM_UNAVAILABLE", "transaction service URL is not configured", http.StatusBadGateway)
+		return errs.New("UPSTREAM_UNAVAILABLE", "transaction service URL is not configured",constx.StatusBadGateway)
 	}
 	u, err := url.Parse(c.BaseURL + path)
 	if err != nil {
-		return errs.New("INTERNAL_ERROR", "invalid transaction service URL", http.StatusInternalServerError)
+		return errs.New("INTERNAL_ERROR", "invalid transaction service URL",constx.StatusInternalServerError)
 	}
 	query := u.Query()
 	query.Set("from", q.From.Format(time.RFC3339))
@@ -54,7 +55,7 @@ func (c *Client) getJSON(ctx context.Context, userID, path string, q contracts.T
 	query.Set("currency", q.Currency)
 	u.RawQuery = query.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, constx.MethodGet, u.String(), nil)
 	if err != nil {
 		return errs.ErrInternal
 	}
@@ -63,14 +64,14 @@ func (c *Client) getJSON(ctx context.Context, userID, path string, q contracts.T
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return errs.New("UPSTREAM_UNAVAILABLE", "transaction service is unavailable", http.StatusBadGateway)
+		return errs.New("UPSTREAM_UNAVAILABLE", "transaction service is unavailable",constx.StatusBadGateway)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return errs.New("UPSTREAM_ERROR", fmt.Sprintf("transaction service returned status %d", resp.StatusCode), http.StatusBadGateway)
+		return errs.New("UPSTREAM_ERROR", fmt.Sprintf("transaction service returned status %d", resp.StatusCode),constx.StatusBadGateway)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return errs.New("UPSTREAM_BAD_RESPONSE", "failed to decode transaction service response", http.StatusBadGateway)
+		return errs.New("UPSTREAM_BAD_RESPONSE", "failed to decode transaction service response",constx.StatusBadGateway)
 	}
 	return nil
 }

@@ -10,7 +10,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/shared/contracts"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
+	"github.com/moon-eye/velune/shared/httpx"
 )
 
 type Client struct {
@@ -68,7 +70,7 @@ func (c *Client) SummaryByCategory(ctx context.Context, userID uuid.UUID, from, 
 }
 
 func (c *Client) get(ctx context.Context, uri string, userID uuid.UUID, v any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
+	req, err := httpx.NewRequestWithContext(ctx, constx.MethodGet, uri, nil)
 	if err != nil {
 		return err
 	}
@@ -80,7 +82,7 @@ func (c *Client) get(ctx context.Context, uri string, userID uuid.UUID, v any) e
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return errs.New("UPSTREAM_ERROR", fmt.Sprintf("transaction-service returned %d", resp.StatusCode), http.StatusBadGateway)
+		return errs.New("UPSTREAM_ERROR", fmt.Sprintf("transaction-service returned %d", resp.StatusCode), constx.StatusBadGateway)
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
 }

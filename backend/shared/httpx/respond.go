@@ -1,17 +1,17 @@
 package httpx
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
 	errs "github.com/moon-eye/velune/shared/errors"
+	"github.com/moon-eye/velune/shared/helper"
 )
 
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	helper.EncodeJSON(w, v)
 }
 
 func WriteError(w http.ResponseWriter, err error) {

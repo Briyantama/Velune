@@ -19,6 +19,12 @@ services:
     ports:
       - "6379:6379"
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
   legacy-api:
     build:
       context: ..
@@ -59,8 +65,18 @@ services:
       JWT_SECRET: dev-only-change-me
       MIGRATIONS_PATH: file:///app/migrations
       LOG_FORMAT: dev
+      BROKER_URL: amqp://guest:guest@rabbitmq:5672/
+      BROKER_EXCHANGE: velune.events
+      BROKER_ROUTING_KEY: notification.overspend.requested
+      BROKER_DLX: velune.events.dlx
+      BROKER_DLQ: velune.events.dlq
+      BROKER_DLQ_ROUTING_KEY: velune.dlq
+      OUTBOX_BATCH_SIZE: "50"
+      OUTBOX_MAX_RETRY: "7"
+      RETRY_BASE_DELAY_SECONDS: "2"
     depends_on:
       - postgres
+      - rabbitmq
     ports:
       - "8082:8082"
     profiles: ["split"]
@@ -87,9 +103,19 @@ services:
       MIGRATIONS_PATH: file:///app/migrations
       TRANSACTION_SERVICE_URL: http://transaction-service:8082
       LOG_FORMAT: dev
+      BROKER_URL: amqp://guest:guest@rabbitmq:5672/
+      BROKER_EXCHANGE: velune.events
+      BROKER_ROUTING_KEY: notification.overspend.requested
+      BROKER_DLX: velune.events.dlx
+      BROKER_DLQ: velune.events.dlq
+      BROKER_DLQ_ROUTING_KEY: velune.dlq
+      OUTBOX_BATCH_SIZE: "50"
+      OUTBOX_MAX_RETRY: "7"
+      RETRY_BASE_DELAY_SECONDS: "2"
     depends_on:
       - postgres
       - transaction-service
+      - rabbitmq
     ports:
       - "8084:8084"
     profiles: ["split"]
@@ -115,7 +141,24 @@ services:
       dockerfile: services/notification-service/Dockerfile
     environment:
       HTTP_PORT: "8086"
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_notification?sslmode=disable
+      MIGRATIONS_PATH: file:///app/migrations
+      JWT_SECRET: dev-only-change-me
+      BROKER_URL: amqp://guest:guest@rabbitmq:5672/
+      BROKER_EXCHANGE: velune.events
+      BROKER_QUEUE: notification.overspend
+      BROKER_ROUTING_KEY: notification.overspend.requested
+      BROKER_DLX: velune.events.dlx
+      BROKER_DLQ: velune.events.dlq
+      BROKER_DLQ_ROUTING_KEY: velune.dlq
+      OUTBOX_BATCH_SIZE: "50"
+      OUTBOX_MAX_RETRY: "7"
+      RETRY_BASE_DELAY_SECONDS: "2"
+      EMAIL_FROM: noreply@velune.local
       LOG_FORMAT: dev
+    depends_on:
+      - rabbitmq
+      - postgres
     ports:
       - "8086:8086"
     profiles: ["split"]
@@ -131,6 +174,7 @@ services:
       CATEGORY_SERVICE_URL: http://category-service:8083
       BUDGET_SERVICE_URL: http://budget-service:8084
       REPORT_SERVICE_URL: http://report-service:8085
+      NOTIFICATION_SERVICE_URL: http://notification-service:8086
       LEGACY_API_URL: http://legacy-api:8090
       LOG_FORMAT: dev
     ports:

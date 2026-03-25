@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -31,9 +32,13 @@ func (m *mockBudgetRepo) SoftDelete(ctx context.Context, userID, id uuid.UUID, v
 }
 
 type mockTxSummaryClient struct {
-	income int64
-	expense int64
+	income     int64
+	expense    int64
 	byCategory map[uuid.UUID]int64
+}
+
+func (m *mockBudgetRepo) TransitionAlertStateAndEnqueue(ctx context.Context, budgetID uuid.UUID, usagePercent float64, envelopePayload json.RawMessage) (bool, error) {
+	return usagePercent >= 100, nil
 }
 
 func (m *mockTxSummaryClient) Summary(ctx context.Context, userID uuid.UUID, from, to time.Time, currency string) (int64, int64, error) {
@@ -108,5 +113,30 @@ func TestBudgetUsage_CategoryBudgetUsesCategoryTotals(t *testing.T) {
 	}
 }
 
-var _ repository.BudgetRepository = (*mockBudgetRepo)(nil)
+func TestBudgetUsage_OverThresholdEnqueues(t *testing.T) {
+	userID := uuid.New()
+	budgetID := uuid.New()
+	svc := &usecase.BudgetService{
+		Budgets: &mockBudgetRepo{getFn: func(ctx context.Context, uid, id uuid.UUID) (*domain.Budget, error) {
+			return &domain.Budget{
+				ID:               budgetID,
+				UserID:           userID,
+				PeriodType:       domain.BudgetPeriodMonthly,
+				StartDate:        time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				EndDate:          time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC),
+				LimitAmountMinor: 1000,
+				Currency:         "USD",
+			}, nil
+		}},
+		Transactions: &mockTxSummaryClient{income: 0, expense: 1200},
+	}
+	usage, err := svc.Usage(context.Background(), userID, budgetID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !usage.IsOverspent {
+		t.Fatalf("expected overspent usage result")
+	}
+}
 
+var _ repository.BudgetRepository = (*mockBudgetRepo)(nil)

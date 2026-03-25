@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/transaction-service/internal/usecase"
 	"github.com/moon-eye/velune/shared/contracts"
+	"github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/httpx"
 )
@@ -62,7 +63,7 @@ func (s *Server) createTransaction(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, t)
+	httpx.WriteJSON(w, constx.StatusCreated, t)
 }
 
 func (s *Server) listTransactions(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +78,7 @@ func (s *Server) listTransactions(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("accountId"); v != "" {
 		id, err := httpx.ParseUUID(v)
 		if err != nil {
-			httpx.WriteError(w, errs.New("VALIDATION_ERROR", "invalid accountId", http.StatusBadRequest))
+			httpx.WriteError(w, errs.New("VALIDATION_ERROR", "invalid accountId", constx.StatusBadRequest))
 			return
 		}
 		accountID = &id
@@ -85,7 +86,7 @@ func (s *Server) listTransactions(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("categoryId"); v != "" {
 		id, err := httpx.ParseUUID(v)
 		if err != nil {
-			httpx.WriteError(w, errs.New("VALIDATION_ERROR", "invalid categoryId", http.StatusBadRequest))
+			httpx.WriteError(w, errs.New("VALIDATION_ERROR", "invalid categoryId", constx.StatusBadRequest))
 			return
 		}
 		categoryID = &id
@@ -109,7 +110,7 @@ func (s *Server) listTransactions(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
+	httpx.WriteJSON(w, constx.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
 }
 
 func (s *Server) deleteTransaction(w http.ResponseWriter, r *http.Request) {
@@ -125,7 +126,7 @@ func (s *Server) deleteTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", constx.StatusBadRequest))
 		return
 	}
 	if err := s.Transactions.Delete(r.Context(), uid, id, v); err != nil {
@@ -151,7 +152,7 @@ func (s *Server) getTransaction(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, t)
+	httpx.WriteJSON(w, constx.StatusOK, t)
 }
 
 func (s *Server) updateTransaction(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +168,7 @@ func (s *Server) updateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", constx.StatusBadRequest))
 		return
 	}
 	var req transactionUpdateReq
@@ -193,7 +194,7 @@ func (s *Server) updateTransaction(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, t)
+	httpx.WriteJSON(w, constx.StatusOK, t)
 }
 
 func (s *Server) transactionsSummary(w http.ResponseWriter, r *http.Request) {
@@ -206,7 +207,7 @@ func (s *Server) transactionsSummary(w http.ResponseWriter, r *http.Request) {
 	from := httpx.ParseTimeQuery(r, "from")
 	to := httpx.ParseTimeQuery(r, "to")
 	if from == nil || to == nil {
-		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "from and to are required RFC3339 values", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "from and to are required RFC3339 values", constx.StatusBadRequest))
 		return
 	}
 	cur := q.Get("currency")
@@ -218,7 +219,7 @@ func (s *Server) transactionsSummary(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, contracts.TransactionSummary{
+	httpx.WriteJSON(w, constx.StatusOK, contracts.TransactionSummary{
 		From:         *from,
 		To:           *to,
 		Currency:     cur,
@@ -238,7 +239,7 @@ func (s *Server) transactionsSummaryByCategory(w http.ResponseWriter, r *http.Re
 	from := httpx.ParseTimeQuery(r, "from")
 	to := httpx.ParseTimeQuery(r, "to")
 	if from == nil || to == nil {
-		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "from and to are required RFC3339 values", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "from and to are required RFC3339 values", constx.StatusBadRequest))
 		return
 	}
 	cur := q.Get("currency")
@@ -258,7 +259,7 @@ func (s *Server) transactionsSummaryByCategory(w http.ResponseWriter, r *http.Re
 			TotalMinor: total,
 		})
 	}
-	httpx.WriteJSON(w, http.StatusOK, contracts.TransactionCategoryTotalsResponse{
+	httpx.WriteJSON(w, constx.StatusOK, contracts.TransactionCategoryTotalsResponse{
 		From:      *from,
 		To:        *to,
 		Currency:  cur,

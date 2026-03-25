@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"errors"
-	"net/http"
 	"strings"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/moon-eye/velune/services/legacy-api/internal/config"
 	"github.com/moon-eye/velune/services/legacy-api/internal/domain"
 	"github.com/moon-eye/velune/services/legacy-api/internal/repository"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/jwt"
 	"go.uber.org/zap"
@@ -47,7 +47,7 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*AuthToke
 		return nil, err
 	}
 	if exists != nil {
-		return nil, errs.New("EMAIL_TAKEN", "email already registered", http.StatusConflict)
+		return nil, errs.New("EMAIL_TAKEN", "email already registered",constx.StatusConflict)
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -76,11 +76,11 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput) (*AuthToken, err
 		return nil, err
 	}
 	if u == nil {
-		return nil, errs.New("INVALID_CREDENTIALS", "invalid email or password", http.StatusUnauthorized)
+		return nil, errs.New("INVALID_CREDENTIALS", "invalid email or password",constx.StatusUnauthorized)
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(in.Password)); err != nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			return nil, errs.New("INVALID_CREDENTIALS", "invalid email or password", http.StatusUnauthorized)
+			return nil, errs.New("INVALID_CREDENTIALS", "invalid email or password",constx.StatusUnauthorized)
 		}
 		return nil, err
 	}

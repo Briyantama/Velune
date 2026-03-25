@@ -2,21 +2,24 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/budget-service/internal/domain"
 	"github.com/moon-eye/velune/services/budget-service/internal/repository"
+	"github.com/moon-eye/velune/shared/contracts"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
+	"github.com/moon-eye/velune/shared/helper"
 	"github.com/moon-eye/velune/shared/pagination"
 	"github.com/moon-eye/velune/shared/stringx"
 )
 
 type BudgetService struct {
-	Budgets       repository.BudgetRepository
-	Transactions  TransactionSummaryClient
+	Budgets      repository.BudgetRepository
+	Transactions TransactionSummaryClient
 }
 
 type TransactionSummaryClient interface {
@@ -25,18 +28,18 @@ type TransactionSummaryClient interface {
 }
 
 type CreateBudgetInput struct {
-	Name             string     `validate:"required,min=1,max=200"`
-	PeriodType       string     `validate:"required,oneof=monthly weekly custom"`
+	Name             string `validate:"required,min=1,max=200"`
+	PeriodType       string `validate:"required,oneof=monthly weekly custom"`
 	CategoryID       *uuid.UUID
-	StartDate        time.Time  `validate:"required"`
-	EndDate          time.Time  `validate:"required"`
-	LimitAmountMinor int64      `validate:"min=0"`
-	Currency         string     `validate:"required,len=3"`
+	StartDate        time.Time `validate:"required"`
+	EndDate          time.Time `validate:"required"`
+	LimitAmountMinor int64     `validate:"min=0"`
+	Currency         string    `validate:"required,len=3"`
 }
 
 func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, in CreateBudgetInput) (*domain.Budget, error) {
 	if in.EndDate.Before(in.StartDate) {
-		return nil, errs.New("VALIDATION_ERROR", "end date must be on or after start date", http.StatusBadRequest)
+		return nil, errs.New("VALIDATION_ERROR", "end date must be on or after start date",constx.StatusBadRequest)
 	}
 	now := time.Now().UTC()
 	b := &domain.Budget{
@@ -70,8 +73,8 @@ func (s *BudgetService) List(ctx context.Context, userID uuid.UUID, page, limit 
 }
 
 type UpdateBudgetInput struct {
-	Name             string    `validate:"required,min=1,max=200"`
-	PeriodType       string    `validate:"required,oneof=monthly weekly custom"`
+	Name             string `validate:"required,min=1,max=200"`
+	PeriodType       string `validate:"required,oneof=monthly weekly custom"`
 	CategoryID       *uuid.UUID
 	StartDate        time.Time `validate:"required"`
 	EndDate          time.Time `validate:"required"`
@@ -81,7 +84,7 @@ type UpdateBudgetInput struct {
 
 func (s *BudgetService) Update(ctx context.Context, userID, id uuid.UUID, version int64, in UpdateBudgetInput) (*domain.Budget, error) {
 	if in.EndDate.Before(in.StartDate) {
-		return nil, errs.New("VALIDATION_ERROR", "end date must be on or after start date", http.StatusBadRequest)
+		return nil, errs.New("VALIDATION_ERROR", "end date must be on or after start date",constx.StatusBadRequest)
 	}
 	b, err := s.Budgets.GetByID(ctx, userID, id)
 	if err != nil {
@@ -102,7 +105,7 @@ func (s *BudgetService) Update(ctx context.Context, userID, id uuid.UUID, versio
 	b.UpdatedAt = now
 	if err := s.Budgets.Update(ctx, b); err != nil {
 		if errors.Is(err, repository.ErrOptimisticLock) {
-			return nil, errs.New("CONFLICT", "version conflict", http.StatusConflict)
+			return nil, errs.New("CONFLICT", "version conflict",constx.StatusConflict)
 		}
 		return nil, err
 	}
@@ -112,21 +115,21 @@ func (s *BudgetService) Update(ctx context.Context, userID, id uuid.UUID, versio
 func (s *BudgetService) Delete(ctx context.Context, userID, id uuid.UUID, version int64) error {
 	err := s.Budgets.SoftDelete(ctx, userID, id, version)
 	if errors.Is(err, repository.ErrOptimisticLock) {
-		return errs.New("CONFLICT", "version conflict", http.StatusConflict)
+		return errs.New("CONFLICT", "version conflict",constx.StatusConflict)
 	}
 	return err
 }
 
 type BudgetUsage struct {
-	BudgetID          uuid.UUID `json:"budgetId"`
-	From              time.Time `json:"from"`
-	To                time.Time `json:"to"`
-	Currency          string    `json:"currency"`
-	LimitAmountMinor  int64     `json:"limitAmountMinor"`
-	SpentMinor        int64     `json:"spentMinor"`
-	RemainingMinor    int64     `json:"remainingMinor"`
-	OverspentMinor    int64     `json:"overspentMinor"`
-	IsOverspent       bool      `json:"isOverspent"`
+	BudgetID         uuid.UUID `json:"budgetId"`
+	From             time.Time `json:"from"`
+	To               time.Time `json:"to"`
+	Currency         string    `json:"currency"`
+	LimitAmountMinor int64     `json:"limitAmountMinor"`
+	SpentMinor       int64     `json:"spentMinor"`
+	RemainingMinor   int64     `json:"remainingMinor"`
+	OverspentMinor   int64     `json:"overspentMinor"`
+	IsOverspent      bool      `json:"isOverspent"`
 }
 
 func (s *BudgetService) Usage(ctx context.Context, userID, budgetID uuid.UUID) (*BudgetUsage, error) {
@@ -138,7 +141,7 @@ func (s *BudgetService) Usage(ctx context.Context, userID, budgetID uuid.UUID) (
 		return nil, errs.ErrNotFound
 	}
 	if s.Transactions == nil {
-		return nil, errs.New("UPSTREAM_UNAVAILABLE", "transaction summary client not configured", http.StatusServiceUnavailable)
+		return nil, errs.New("UPSTREAM_UNAVAILABLE", "transaction summary client not configured",constx.StatusServiceUnavailable)
 	}
 
 	var spent int64
@@ -161,7 +164,7 @@ func (s *BudgetService) Usage(ctx context.Context, userID, budgetID uuid.UUID) (
 	if remaining < 0 {
 		overspent = -remaining
 	}
-	return &BudgetUsage{
+	result := &BudgetUsage{
 		BudgetID:         b.ID,
 		From:             b.StartDate,
 		To:               b.EndDate,
@@ -171,5 +174,31 @@ func (s *BudgetService) Usage(ctx context.Context, userID, budgetID uuid.UUID) (
 		RemainingMinor:   remaining,
 		OverspentMinor:   overspent,
 		IsOverspent:      overspent > 0,
-	}, nil
+	}
+	usagePercent := 0.0
+	if b.LimitAmountMinor > 0 {
+		usagePercent = (float64(spent) / float64(b.LimitAmountMinor)) * 100
+	}
+	envelopePayload, _ := json.Marshal(contracts.EventEnvelope{
+		EventID:     uuid.New(),
+		EventType:   contracts.EventOverspendAlertRequested,
+		Source:      "budget-service",
+		OccurredAt:  time.Now().UTC(),
+		UserID:      &userID,
+		Idempotency: "overspend:" + b.ID.String() + ":v" + helper.ToString(b.Version),
+		Payload: helper.ToJSON(contracts.OverspendAlertRequested{
+			BudgetID:         b.ID,
+			UserID:           userID,
+			CategoryID:       b.CategoryID,
+			Currency:         b.Currency,
+			LimitAmountMinor: b.LimitAmountMinor,
+			SpentMinor:       spent,
+			UsagePercent:     usagePercent,
+			IsOverspent:      overspent > 0,
+		}),
+	})
+	if _, err := s.Budgets.TransitionAlertStateAndEnqueue(ctx, b.ID, usagePercent, envelopePayload); err != nil {
+		return nil, err
+	}
+	return result, nil
 }

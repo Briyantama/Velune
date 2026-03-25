@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 	"github.com/moon-eye/velune/services/auth-service/internal/usecase"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/httpx"
 	"github.com/moon-eye/velune/shared/stringx"
@@ -47,7 +48,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Validate.Struct(req); err != nil {
-		httpx.WriteError(w, errs.New("VALIDATION_ERROR", err.Error(), http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", err.Error(), constx.StatusBadRequest))
 		return
 	}
 
@@ -60,7 +61,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, resp)
+	httpx.WriteJSON(w, constx.StatusCreated, resp)
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +71,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Validate.Struct(req); err != nil {
-		httpx.WriteError(w, errs.New("VALIDATION_ERROR", err.Error(), http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", err.Error(), constx.StatusBadRequest))
 		return
 	}
 
@@ -82,7 +83,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, resp)
+	httpx.WriteJSON(w, constx.StatusOK, resp)
 }
 
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +93,7 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Validate.Struct(req); err != nil {
-		httpx.WriteError(w, errs.New("VALIDATION_ERROR", err.Error(), http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", err.Error(), constx.StatusBadRequest))
 		return
 	}
 
@@ -103,7 +104,7 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, resp)
+	httpx.WriteJSON(w, constx.StatusOK, resp)
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
@@ -123,5 +124,5 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, resp)
+	httpx.WriteJSON(w, constx.StatusOK, resp)
 }

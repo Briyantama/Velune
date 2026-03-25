@@ -1,12 +1,12 @@
 package httpapi
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/report-service/internal/usecase"
+	constx "github.com/moon-eye/velune/shared/constx"
 	"go.uber.org/zap"
 )
 
@@ -17,12 +17,12 @@ func TestMonthlyValidation_MissingYear(t *testing.T) {
 		JWTSecret: "secret",
 	}
 	handler := NewRouter(srv)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/reports/monthly?month=3", nil)
+	req := httptest.NewRequest(constx.MethodGet, "/api/v1/reports/monthly?month=3", nil)
 	req.Header.Set("X-User-ID", uuid.NewString())
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected %d got %d", http.StatusBadRequest, rec.Code)
+	if rec.Code != constx.StatusBadRequest {
+		t.Fatalf("expected %d got %d",constx.StatusBadRequest, rec.Code)
 	}
 }
 
@@ -33,10 +33,10 @@ func TestMonthlyValidation_MissingAuth(t *testing.T) {
 		JWTSecret: "secret",
 	}
 	handler := NewRouter(srv)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/reports/monthly?year=2026&month=3", nil)
+	req := httptest.NewRequest(constx.MethodGet, "/api/v1/reports/monthly?year=2026&month=3", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("expected %d got %d", http.StatusUnauthorized, rec.Code)
+	if rec.Code != constx.StatusUnauthorized {
+		t.Fatalf("expected %d got %d",constx.StatusUnauthorized, rec.Code)
 	}
 }

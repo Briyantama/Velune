@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"os/signal"
@@ -13,6 +12,8 @@ import (
 	"time"
 
 	sharedconfig "github.com/moon-eye/velune/shared/config"
+	constx "github.com/moon-eye/velune/shared/constx"
+	httpx "github.com/moon-eye/velune/shared/httpx"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
 	"github.com/moon-eye/velune/shared/stringx"
 	"go.uber.org/zap"
@@ -41,10 +42,10 @@ func main() {
 		fallback := os.Getenv("LEGACY_API_URL")
 		if primary == "" {
 			if fallback != "" {
-				mustProxy(fallback).ServeHTTP(w, r)
+				httpx.MustProxy(fallback).ServeHTTP(w, r)
 				return
 			}
-			http.NotFound(w, r)
+		  http.NotFound(w, r)
 			return
 		}
 		reportsProxyWithFallback(primary, fallback).ServeHTTP(w, r)
@@ -54,7 +55,7 @@ func main() {
 		fallback := os.Getenv("LEGACY_API_URL")
 		if primary == "" {
 			if fallback != "" {
-				mustProxy(fallback).ServeHTTP(w, r)
+				httpx.MustProxy(fallback).ServeHTTP(w, r)
 				return
 			}
 			http.NotFound(w, r)
@@ -68,11 +69,11 @@ func main() {
 			return
 		}
 		if leg := os.Getenv("LEGACY_API_URL"); leg != "" {
-			mustProxy(leg).ServeHTTP(w, r)
+			httpx.MustProxy(leg).ServeHTTP(w, r)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
+		w.WriteHeader(constx.StatusNotFound)
 		_, _ = w.Write([]byte(`{"code":"NOT_FOUND","message":"no upstream configured for path"}`))
 	})
 
@@ -96,7 +97,7 @@ func main() {
 func routesHandler(cfg *sharedconfig.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"auth":"` + cfg.AuthServiceURL + `","transaction":"` + cfg.TransactionServiceURL + `","category":"` + cfg.CategoryServiceURL + `","budget":"` + cfg.BudgetServiceURL + `","report":"` + cfg.ReportServiceURL + `","legacy":"` + os.Getenv("LEGACY_API_URL") + `"}`))
+		_, _ = w.Write([]byte(`{"auth":"` + cfg.AuthServiceURL + `","transaction":"` + cfg.TransactionServiceURL + `","category":"` + cfg.CategoryServiceURL + `","budget":"` + cfg.BudgetServiceURL + `","report":"` + cfg.ReportServiceURL + `","notification":"` + cfg.NotificationServiceURL + `","legacy":"` + os.Getenv("LEGACY_API_URL") + `"}`))
 	}
 }
 
@@ -112,13 +113,14 @@ func pickProxy(cfg *sharedconfig.Service, path string) http.Handler {
 		{"/api/v1/recurring", cfg.TransactionServiceURL},
 		{"/api/v1/categories", cfg.TransactionServiceURL},
 		{"/api/v1/budgets", cfg.BudgetServiceURL},
+		{"/api/v1/notifications", cfg.NotificationServiceURL},
 	}
 	for _, ru := range rules {
 		if ru.target == "" {
 			continue
 		}
 		if stringx.HasPrefix(path, ru.prefix) {
-			return mustProxy(ru.target)
+			return httpx.MustProxy(ru.target)
 		}
 	}
 	return nil
@@ -128,16 +130,16 @@ func reportsProxyWithFallback(primaryURL, fallbackURL string) http.Handler {
 	primary, err := url.Parse(primaryURL)
 	if err != nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "bad report-service URL", http.StatusInternalServerError)
+			http.Error(w, "bad report-service URL", constx.StatusInternalServerError)
 		})
 	}
-	primaryProxy := httputil.NewSingleHostReverseProxy(primary)
+	primaryProxy := httpx.SingleHostReverseProxy(primary)
 	var fallbackProxy http.Handler
 	if fallbackURL != "" {
-		fallbackProxy = mustProxy(fallbackURL)
+		fallbackProxy = httpx.MustProxy(fallbackURL)
 	}
 	primaryProxy.ModifyResponse = func(resp *http.Response) error {
-		if resp.StatusCode == http.StatusNotFound || resp.StatusCode >= 500 {
+		if resp.StatusCode == constx.StatusNotFound || resp.StatusCode >= constx.StatusInternalServerError {
 			return errors.New("report upstream fallback trigger")
 		}
 		return nil
@@ -147,17 +149,7 @@ func reportsProxyWithFallback(primaryURL, fallbackURL string) http.Handler {
 			fallbackProxy.ServeHTTP(w, r)
 			return
 		}
-		http.Error(w, "report upstream unavailable", http.StatusBadGateway)
+		http.Error(w, "report upstream unavailable", constx.StatusBadGateway)
 	}
 	return primaryProxy
-}
-
-func mustProxy(origin string) http.Handler {
-	u, err := url.Parse(origin)
-	if err != nil {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "bad upstream URL", http.StatusInternalServerError)
-		})
-	}
-	return httputil.NewSingleHostReverseProxy(u)
 }

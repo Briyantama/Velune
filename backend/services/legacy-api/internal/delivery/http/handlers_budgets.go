@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/legacy-api/internal/usecase"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/httpx"
 )
@@ -58,7 +59,7 @@ func (s *Server) createBudget(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, b)
+	httpx.WriteJSON(w,constx.StatusCreated, b)
 }
 
 func (s *Server) listBudgets(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +73,7 @@ func (s *Server) listBudgets(w http.ResponseWriter, r *http.Request) {
 	if v := r.URL.Query().Get("activeOn"); v != "" {
 		t, err := time.Parse(time.RFC3339, v)
 		if err != nil {
-			httpx.WriteError(w, errs.New("VALIDATION_ERROR", "activeOn must be RFC3339", http.StatusBadRequest))
+			httpx.WriteError(w, errs.New("VALIDATION_ERROR", "activeOn must be RFC3339",constx.StatusBadRequest))
 			return
 		}
 		activeOn = &t
@@ -82,7 +83,7 @@ func (s *Server) listBudgets(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
+	httpx.WriteJSON(w,constx.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
 }
 
 func (s *Server) updateBudget(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +108,7 @@ func (s *Server) updateBudget(w http.ResponseWriter, r *http.Request) {
 	}
 	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required",constx.StatusBadRequest))
 		return
 	}
 	b, err := s.Budgets.Update(r.Context(), uid, id, v, usecase.UpdateBudgetInput{
@@ -123,7 +124,7 @@ func (s *Server) updateBudget(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, b)
+	httpx.WriteJSON(w,constx.StatusOK, b)
 }
 
 func (s *Server) deleteBudget(w http.ResponseWriter, r *http.Request) {
@@ -139,12 +140,12 @@ func (s *Server) deleteBudget(w http.ResponseWriter, r *http.Request) {
 	}
 	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required",constx.StatusBadRequest))
 		return
 	}
 	if err := s.Budgets.Delete(r.Context(), uid, id, v); err != nil {
 		httpx.WriteError(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	w.WriteHeader(constx.StatusNoContent)
 }

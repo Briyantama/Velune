@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/moon-eye/velune/services/legacy-api/internal/usecase"
+	constx "github.com/moon-eye/velune/shared/constx"
 	"github.com/moon-eye/velune/shared/httpx"
 )
 
@@ -37,7 +38,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, tok)
+	httpx.WriteJSON(w,constx.StatusCreated, tok)
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
@@ -58,5 +59,5 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, tok)
+	httpx.WriteJSON(w,constx.StatusOK, tok)
 }

@@ -2,13 +2,14 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/moon-eye/velune/services/transaction-service/internal/domain"
 	"github.com/moon-eye/velune/services/transaction-service/internal/repository"
+	"github.com/moon-eye/velune/shared/contracts"
 	"github.com/moon-eye/velune/shared/helper"
 	db "github.com/moon-eye/velune/shared/sqlc/generated"
 )
@@ -61,6 +62,9 @@ func (l *Ledger) CreateTransaction(ctx context.Context, t *domain.Transaction) e
 		return err
 	}
 	if err := l.insertChangeEvent(ctx, qtx, t.UserID, "transactions", t.ID, "CREATE", t.Version, t); err != nil {
+		return err
+	}
+	if err := l.insertOutboxEvent(ctx, tx, buildTxCreatedEnvelope(t)); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -125,6 +129,9 @@ func (l *Ledger) UpdateTransaction(ctx context.Context, userID uuid.UUID, next *
 	}); err != nil {
 		return err
 	}
+	if err := l.insertOutboxEvent(ctx, tx, buildTxUpdatedEnvelope(next)); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 
@@ -187,6 +194,9 @@ func (l *Ledger) SoftDeleteTransaction(ctx context.Context, userID, id uuid.UUID
 		return repository.ErrOptimisticLock
 	}
 	if err := l.insertChangeEvent(ctx, qtx, userID, "transactions", id, "DELETE", version+1, tr); err != nil {
+		return err
+	}
+	if err := l.insertOutboxEvent(ctx, tx, buildTxDeletedEnvelope(userID, id, version+1)); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -287,7 +297,7 @@ func (l *Ledger) insertTransaction(ctx context.Context, qtx *db.Queries, t *doma
 }
 
 func (l *Ledger) insertChangeEvent(ctx context.Context, qtx *db.Queries, userID uuid.UUID, entityType string, entityID uuid.UUID, op string, ver int64, payload any) error {
-	b, err := json.Marshal(payload)
+	b, err := helper.ToJSONMarshal(payload)
 	if err != nil {
 		return err
 	}
@@ -378,5 +388,91 @@ func (l *Ledger) applyReverseImpact(ctx context.Context, tx pgx.Tx, t *domain.Tr
 		return l.applyAccountDelta(ctx, tx, t.UserID, t.AccountID, -t.AmountMinor, t.Currency)
 	default:
 		return errors.New("unsupported transaction type")
+	}
+}
+
+func (l *Ledger) insertOutboxEvent(ctx context.Context, tx pgx.Tx, env contracts.EventEnvelope) error {
+	body, err := helper.ToJSONMarshal(env)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO event_outbox (id, event_type, payload, status, retry_count, next_retry_at, created_at, updated_at)
+		VALUES ($1, $2, $3, 'pending', 0, now(), now(), now())
+	`, helper.ToPgUUID(env.EventID), env.EventType, body)
+	return err
+}
+
+func buildTxCreatedEnvelope(t *domain.Transaction) contracts.EventEnvelope {
+	payload, err := helper.ToJSONMarshal(contracts.TransactionCreated{
+		TransactionID: t.ID,
+		UserID:        t.UserID,
+		AccountID:     t.AccountID,
+		CategoryID:    t.CategoryID,
+		AmountMinor:   t.AmountMinor,
+		Currency:      t.Currency,
+		Type:          string(t.Type),
+		OccurredAt:    t.OccurredAt,
+		Version:       t.Version,
+	})
+	if err != nil {
+		return contracts.EventEnvelope{}
+	}
+	uid := t.UserID
+	return contracts.EventEnvelope{
+		EventID:     uuid.New(),
+		EventType:   "transaction.created",
+		Source:      "transaction-service",
+		OccurredAt:  time.Now().UTC(),
+		UserID:      &uid,
+		Idempotency: "tx:" + t.ID.String() + ":v" + helper.ToString(t.Version),
+		Payload:     payload,
+	}
+}
+
+func buildTxUpdatedEnvelope(t *domain.Transaction) contracts.EventEnvelope {
+	payload, err := helper.ToJSONMarshal(contracts.TransactionUpdated{
+		TransactionID: t.ID,
+		UserID:        t.UserID,
+		AmountMinor:   t.AmountMinor,
+		Currency:      t.Currency,
+		Type:          string(t.Type),
+		OccurredAt:    t.OccurredAt,
+		Version:       t.Version,
+	})
+	if err != nil {
+		return contracts.EventEnvelope{}
+	}
+	uid := t.UserID
+	return contracts.EventEnvelope{
+		EventID:     uuid.New(),
+		EventType:   "transaction.updated",
+		Source:      "transaction-service",
+		OccurredAt:  time.Now().UTC(),
+		UserID:      &uid,
+		Idempotency: "tx:" + t.ID.String() + ":v" + helper.ToString(t.Version),
+		Payload:     payload,
+	}
+}
+
+func buildTxDeletedEnvelope(userID, id uuid.UUID, version int64) contracts.EventEnvelope {
+	payload, err := helper.ToJSONMarshal(contracts.TransactionDeleted{
+		TransactionID: id,
+		UserID:        userID,
+		Version:       version,
+		DeletedAt:     time.Now().UTC(),
+	})
+	if err != nil {
+		return contracts.EventEnvelope{}
+	}
+	uid := userID
+	return contracts.EventEnvelope{
+		EventID:     uuid.New(),
+		EventType:   "transaction.deleted",
+		Source:      "transaction-service",
+		OccurredAt:  time.Now().UTC(),
+		UserID:      &uid,
+		Idempotency: "tx:" + id.String() + ":v" + helper.ToString(version),
+		Payload:     payload,
 	}
 }

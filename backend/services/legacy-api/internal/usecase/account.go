@@ -3,13 +3,13 @@ package usecase
 import (
 	"context"
 	"errors"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/legacy-api/internal/domain"
 	"github.com/moon-eye/velune/services/legacy-api/internal/repository"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/pagination"
 )
@@ -79,7 +79,7 @@ func (s *AccountService) Update(ctx context.Context, userID uuid.UUID, id uuid.U
 	a.UpdatedAt = now
 	if err := s.Accounts.Update(ctx, a); err != nil {
 		if errors.Is(err, repository.ErrOptimisticLock) {
-			return nil, errs.New("CONFLICT", "version conflict", http.StatusConflict)
+			return nil, errs.New("CONFLICT", "version conflict",constx.StatusConflict)
 		}
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (s *AccountService) Update(ctx context.Context, userID uuid.UUID, id uuid.U
 func (s *AccountService) Delete(ctx context.Context, userID, id uuid.UUID, version int64) error {
 	err := s.Accounts.SoftDelete(ctx, userID, id, version)
 	if errors.Is(err, repository.ErrOptimisticLock) {
-		return errs.New("CONFLICT", "version conflict", http.StatusConflict)
+		return errs.New("CONFLICT", "version conflict",constx.StatusConflict)
 	}
 	return err
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/moon-eye/velune/services/transaction-service/internal/usecase"
+	"github.com/moon-eye/velune/shared/constx"
 	"github.com/moon-eye/velune/shared/httpx"
 	"github.com/moon-eye/velune/shared/middlewares"
 	"go.uber.org/zap"
@@ -70,9 +71,9 @@ func NewRouter(s *Server) http.Handler {
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	if s.DB != nil {
 		if err := s.DB.Ping(r.Context()); err != nil {
-			httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "degraded", "database": "down"})
+			httpx.WriteJSON(w, constx.StatusServiceUnavailable, map[string]string{"status": "degraded", "database": "down"})
 			return
 		}
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpx.WriteJSON(w, constx.StatusOK, map[string]string{"status": "ok"})
 }

@@ -3,12 +3,15 @@ package httpx
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 )
 
@@ -26,7 +29,7 @@ func DecodeJSON(r *http.Request, v any) error {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
-		return errs.New("VALIDATION_ERROR", err.Error(), http.StatusBadRequest)
+		return errs.New("VALIDATION_ERROR", err.Error(), constx.StatusBadRequest)
 	}
 	return nil
 }
@@ -35,7 +38,7 @@ func ParseUUIDParam(r *http.Request, name string) (uuid.UUID, error) {
 	idStr := chi.URLParam(r, name)
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		return uuid.Nil, errs.New("VALIDATION_ERROR", "invalid id", http.StatusBadRequest)
+		return uuid.Nil, errs.New("VALIDATION_ERROR", "invalid id", constx.StatusBadRequest)
 	}
 	return id, nil
 }
@@ -43,7 +46,7 @@ func ParseUUIDParam(r *http.Request, name string) (uuid.UUID, error) {
 func ParseUUID(s string) (uuid.UUID, error) {
 	id, err := uuid.Parse(s)
 	if err != nil {
-		return uuid.Nil, errs.New("VALIDATION_ERROR", "invalid id", http.StatusBadRequest)
+		return uuid.Nil, errs.New("VALIDATION_ERROR", "invalid id", constx.StatusBadRequest)
 	}
 	return id, nil
 }
@@ -73,7 +76,7 @@ func ParseInt64Query(r *http.Request, key string) (int64, bool) {
 
 func ValidateStruct(s any) error {
 	if err := validator.New().Struct(s); err != nil {
-		return errs.New("VALIDATION_ERROR", err.Error(), http.StatusBadRequest)
+		return errs.New("VALIDATION_ERROR", err.Error(), constx.StatusBadRequest)
 	}
 	return nil
 }
@@ -84,4 +87,46 @@ func MustUserID(r *http.Request) (uuid.UUID, error) {
 		return uuid.Nil, errs.ErrUnauthorized
 	}
 	return uid, nil
+}
+
+func MustProxy(origin string) http.Handler {
+	u, err := url.Parse(origin)
+	if err != nil {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "bad upstream URL", constx.StatusInternalServerError)
+		})
+	}
+	return httputil.NewSingleHostReverseProxy(u)
+}
+
+func SingleHostReverseProxy(primary *url.URL) *httputil.ReverseProxy {
+	return httputil.NewSingleHostReverseProxy(primary)
+}
+
+func MustProxyWithFallback(primaryURL, fallbackURL string) http.Handler {
+	primary, err := url.Parse(primaryURL)
+	if err != nil {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "bad report-service URL", constx.StatusInternalServerError)
+		})
+	}
+	primaryProxy := SingleHostReverseProxy(primary)
+	var fallbackProxy http.Handler
+	if fallbackURL != "" {
+		fallbackProxy = MustProxy(fallbackURL)
+	}
+	primaryProxy.ModifyResponse = func(resp *http.Response) error {
+		if resp.StatusCode == constx.StatusNotFound || resp.StatusCode >= constx.StatusInternalServerError {
+			return errs.New("UPSTREAM_FALLBACK_TRIGGER", "report upstream fallback trigger", constx.StatusBadGateway)
+		}
+		return nil
+	}
+	primaryProxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, _ error) {
+		if fallbackProxy != nil {
+			fallbackProxy.ServeHTTP(w, r)
+			return
+		}
+		http.Error(w, "report upstream unavailable", constx.StatusBadGateway)
+	}
+	return primaryProxy
 }

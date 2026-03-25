@@ -3,7 +3,7 @@
 ## Services
 
 | Service | Responsibility | Default port (local) |
-|---------|------------------|------------------------|
+| ------- | -------------- | -------------------- |
 | `api-gateway` | Strangler HTTP entry, routes to microservices or legacy | 8080 |
 | `legacy-api` | Monolithic API during migration (Postgres `velune_legacy`) | 8090 |
 | `auth-service` | Identity, JWT access/refresh, password hashing | 8081 |

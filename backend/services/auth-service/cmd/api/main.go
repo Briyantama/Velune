@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -16,11 +15,12 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	sharedconfig "github.com/moon-eye/velune/shared/config"
-	sharedlog "github.com/moon-eye/velune/shared/logger"
 	httpapi "github.com/moon-eye/velune/services/auth-service/internal/delivery/http"
 	postgres "github.com/moon-eye/velune/services/auth-service/internal/infrastructure/postgres"
 	"github.com/moon-eye/velune/services/auth-service/internal/usecase"
+	sharedconfig "github.com/moon-eye/velune/shared/config"
+	"github.com/moon-eye/velune/shared/helper"
+	sharedlog "github.com/moon-eye/velune/shared/logger"
 	"go.uber.org/zap"
 )
 
@@ -102,7 +102,7 @@ func main() {
 func health() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = helper.EncodeJSON(w, map[string]any{
 			"status":  "ok",
 			"service": "auth-service",
 		})

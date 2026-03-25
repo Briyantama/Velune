@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -115,6 +116,48 @@ func (r *BudgetRepo) SoftDelete(ctx context.Context, userID, id uuid.UUID, versi
 		return repository.ErrOptimisticLock
 	}
 	return nil
+}
+
+func (r *BudgetRepo) TransitionAlertStateAndEnqueue(ctx context.Context, budgetID uuid.UUID, usagePercent float64, envelopePayload json.RawMessage) (bool, error) {
+	tx, err := r.s.Pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	state := "under"
+	if usagePercent >= 100 {
+		state = "over"
+	}
+	var prevState string
+	err = tx.QueryRow(ctx, `SELECT last_threshold_state FROM budget_alert_state WHERE budget_id = $1 FOR UPDATE`, helper.ToPgUUID(budgetID)).Scan(&prevState)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return false, err
+	}
+	emit := prevState != state && state == "over"
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO budget_alert_state (budget_id, last_usage_percent, last_threshold_state, last_emitted_at, updated_at)
+		VALUES ($1, $2, $3, CASE WHEN $4 THEN now() ELSE NULL END, now())
+		ON CONFLICT (budget_id) DO UPDATE
+		SET last_usage_percent = EXCLUDED.last_usage_percent,
+		    last_threshold_state = EXCLUDED.last_threshold_state,
+		    last_emitted_at = CASE WHEN $4 THEN now() ELSE budget_alert_state.last_emitted_at END,
+		    updated_at = now()
+	`, helper.ToPgUUID(budgetID), usagePercent, state, emit); err != nil {
+		return false, err
+	}
+	if emit {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO event_outbox (id, event_type, payload, status, retry_count, next_retry_at, created_at, updated_at)
+			VALUES ($1, 'notification.overspend.requested', $2, 'pending', 0, now(), now(), now())
+		`, helper.ToPgUUID(uuid.New()), envelopePayload); err != nil {
+			return false, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return emit, nil
 }
 
 func budgetFromModel(m db.Budget) *domain.Budget {

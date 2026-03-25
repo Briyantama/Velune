@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/moon-eye/velune/services/transaction-service/internal/usecase"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/httpx"
 )
@@ -43,7 +44,7 @@ func (s *Server) createAccount(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, a)
+	httpx.WriteJSON(w,constx.StatusCreated, a)
 }
 
 func (s *Server) listAccounts(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +59,7 @@ func (s *Server) listAccounts(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
+	httpx.WriteJSON(w,constx.StatusOK, map[string]any{"items": list, "total": total, "page": page, "limit": limit})
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +78,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, a)
+	httpx.WriteJSON(w,constx.StatusOK, a)
 }
 
 func (s *Server) updateAccount(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +103,7 @@ func (s *Server) updateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required",constx.StatusBadRequest))
 		return
 	}
 	a, err := s.Accounts.Update(r.Context(), uid, id, v, usecase.UpdateAccountInput{
@@ -113,7 +114,7 @@ func (s *Server) updateAccount(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, a)
+	httpx.WriteJSON(w,constx.StatusOK, a)
 }
 
 func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +130,7 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	v, ok := httpx.ParseInt64Query(r, "version")
 	if !ok {
-		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required", http.StatusBadRequest))
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", "version query is required",constx.StatusBadRequest))
 		return
 	}
 	if err := s.Accounts.Delete(r.Context(), uid, id, v); err != nil {

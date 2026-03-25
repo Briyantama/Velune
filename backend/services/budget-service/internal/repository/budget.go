@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,4 +15,5 @@ type BudgetRepository interface {
 	List(ctx context.Context, userID uuid.UUID, limit, offset int, activeOn *time.Time) ([]domain.Budget, int64, error)
 	Update(ctx context.Context, b *domain.Budget) error
 	SoftDelete(ctx context.Context, userID, id uuid.UUID, version int64) error
+	TransitionAlertStateAndEnqueue(ctx context.Context, budgetID uuid.UUID, usagePercent float64, envelopePayload json.RawMessage) (bool, error)
 }

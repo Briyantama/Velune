@@ -3,13 +3,13 @@ package usecase
 import (
 	"context"
 	"errors"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/legacy-api/internal/domain"
 	"github.com/moon-eye/velune/services/legacy-api/internal/repository"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/pagination"
 )
@@ -37,7 +37,7 @@ func (s *RecurringService) Create(ctx context.Context, userID uuid.UUID, in Crea
 		return nil, err
 	}
 	if acct == nil {
-		return nil, errs.New("NOT_FOUND", "account not found", http.StatusNotFound)
+		return nil, errs.New("NOT_FOUND", "account not found",constx.StatusNotFound)
 	}
 	if in.CategoryID != nil {
 		c, err := s.Categories.GetByID(ctx, userID, *in.CategoryID)
@@ -45,7 +45,7 @@ func (s *RecurringService) Create(ctx context.Context, userID uuid.UUID, in Crea
 			return nil, err
 		}
 		if c == nil {
-			return nil, errs.New("NOT_FOUND", "category not found", http.StatusNotFound)
+			return nil, errs.New("NOT_FOUND", "category not found",constx.StatusNotFound)
 		}
 	}
 	now := time.Now().UTC()
@@ -79,7 +79,7 @@ func (s *RecurringService) List(ctx context.Context, userID uuid.UUID, page, lim
 func (s *RecurringService) Delete(ctx context.Context, userID, id uuid.UUID, version int64) error {
 	err := s.Recurring.SoftDelete(ctx, userID, id, version)
 	if errors.Is(err, repository.ErrOptimisticLock) {
-		return errs.New("CONFLICT", "version conflict", http.StatusConflict)
+		return errs.New("CONFLICT", "version conflict",constx.StatusConflict)
 	}
 	return err
 }

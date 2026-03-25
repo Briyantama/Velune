@@ -1,7 +1,10 @@
 package helper
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http"
+	"strconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -24,4 +27,39 @@ func ToInt64(v any) (int64, error) {
 	default:
 		return 0, errors.New("unexpected numeric type")
 	}
+}
+
+func ToString(v any) string {
+	switch n := v.(type) {
+	case int64:
+		return strconv.FormatInt(n, 10)
+	case int32:
+		return strconv.FormatInt(int64(n), 10)
+	case int:
+		return strconv.FormatInt(int64(n), 10)
+	case float64:
+		return strconv.FormatFloat(n, 'f', -1, 64)
+	case string:
+		return n
+	default:
+		return ""
+	}
+}
+
+func ToJSON(v any) json.RawMessage {
+	b, _ := json.Marshal(v)
+	return b
+}
+
+func ToJSONMarshal(v any) (json.RawMessage, error) {
+	return json.Marshal(v)
+}
+
+func ToJSONUnmarshal(b []byte, v any) error {
+	return json.Unmarshal(b, v)
+}
+
+func EncodeJSON(w http.ResponseWriter, encode any) error {
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(encode)
 }

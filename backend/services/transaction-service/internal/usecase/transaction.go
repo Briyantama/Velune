@@ -3,12 +3,12 @@ package usecase
 import (
 	"context"
 	"errors"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/transaction-service/internal/domain"
 	"github.com/moon-eye/velune/services/transaction-service/internal/repository"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/pagination"
 	"github.com/moon-eye/velune/shared/stringx"
@@ -16,22 +16,22 @@ import (
 )
 
 type TransactionService struct {
-	Ledger        repository.Ledger
-	Transactions  repository.TransactionRepository
-	Accounts      repository.AccountRepository
-	Categories    repository.CategoryRepository
-	Logger        *zap.Logger
+	Ledger       repository.Ledger
+	Transactions repository.TransactionRepository
+	Accounts     repository.AccountRepository
+	Categories   repository.CategoryRepository
+	Logger       *zap.Logger
 }
 
 type CreateTransactionInput struct {
-	AccountID               uuid.UUID  `validate:"required"`
-	CategoryID              *uuid.UUID
-	CounterpartyAccountID   *uuid.UUID
-	AmountMinor             int64      `validate:"required"`
-	Currency                string     `validate:"required,len=3"`
-	Type                    string     `validate:"required,oneof=income expense transfer adjustment"`
-	Description             string     `validate:"max=2000"`
-	OccurredAt              time.Time  `validate:"required"`
+	AccountID             uuid.UUID `validate:"required"`
+	CategoryID            *uuid.UUID
+	CounterpartyAccountID *uuid.UUID
+	AmountMinor           int64     `validate:"required"`
+	Currency              string    `validate:"required,len=3"`
+	Type                  string    `validate:"required,oneof=income expense transfer adjustment"`
+	Description           string    `validate:"max=2000"`
+	OccurredAt            time.Time `validate:"required"`
 }
 
 func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, in CreateTransactionInput) (*domain.Transaction, error) {
@@ -60,7 +60,7 @@ func (s *TransactionService) Create(ctx context.Context, userID uuid.UUID, in Cr
 			return nil, errs.ErrInsufficient
 		}
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, errs.New("NOT_FOUND", "account not found", http.StatusNotFound)
+			return nil, errs.New("NOT_FOUND", "account not found",constx.StatusNotFound)
 		}
 		return nil, err
 	}
@@ -76,21 +76,21 @@ func (s *TransactionService) validateCreate(ctx context.Context, userID uuid.UUI
 	switch tt {
 	case domain.TransactionIncome, domain.TransactionExpense:
 		if in.AmountMinor <= 0 {
-			return errs.New("VALIDATION_ERROR", "amount must be positive", http.StatusBadRequest)
+			return errs.New("VALIDATION_ERROR", "amount must be positive",constx.StatusBadRequest)
 		}
 	case domain.TransactionTransfer:
 		if in.AmountMinor <= 0 || in.CounterpartyAccountID == nil {
-			return errs.New("VALIDATION_ERROR", "transfer requires positive amount and counterparty account", http.StatusBadRequest)
+			return errs.New("VALIDATION_ERROR", "transfer requires positive amount and counterparty account",constx.StatusBadRequest)
 		}
 		if *in.CounterpartyAccountID == in.AccountID {
-			return errs.New("VALIDATION_ERROR", "cannot transfer to the same account", http.StatusBadRequest)
+			return errs.New("VALIDATION_ERROR", "cannot transfer to the same account",constx.StatusBadRequest)
 		}
 	case domain.TransactionAdjustment:
 		if in.AmountMinor == 0 {
-			return errs.New("VALIDATION_ERROR", "adjustment amount cannot be zero", http.StatusBadRequest)
+			return errs.New("VALIDATION_ERROR", "adjustment amount cannot be zero",constx.StatusBadRequest)
 		}
 	default:
-		return errs.New("VALIDATION_ERROR", "invalid transaction type", http.StatusBadRequest)
+		return errs.New("VALIDATION_ERROR", "invalid transaction type",constx.StatusBadRequest)
 	}
 	if in.CategoryID != nil {
 		cat, err := s.Categories.GetByID(ctx, userID, *in.CategoryID)
@@ -98,7 +98,7 @@ func (s *TransactionService) validateCreate(ctx context.Context, userID uuid.UUI
 			return err
 		}
 		if cat == nil {
-			return errs.New("NOT_FOUND", "category not found", http.StatusNotFound)
+			return errs.New("NOT_FOUND", "category not found",constx.StatusNotFound)
 		}
 	}
 	return nil
@@ -156,7 +156,7 @@ func (s *TransactionService) Delete(ctx context.Context, userID, id uuid.UUID, v
 		return errs.ErrNotFound
 	}
 	if errors.Is(err, repository.ErrOptimisticLock) {
-		return errs.New("CONFLICT", "version conflict", http.StatusConflict)
+		return errs.New("CONFLICT", "version conflict",constx.StatusConflict)
 	}
 	return err
 }
@@ -196,7 +196,7 @@ func (s *TransactionService) Update(ctx context.Context, userID, id uuid.UUID, v
 		return nil, errs.ErrNotFound
 	}
 	if current.Version != version {
-		return nil, errs.New("CONFLICT", "version conflict", http.StatusConflict)
+		return nil, errs.New("CONFLICT", "version conflict",constx.StatusConflict)
 	}
 
 	next := *current
@@ -219,7 +219,7 @@ func (s *TransactionService) Update(ctx context.Context, userID, id uuid.UUID, v
 			return nil, errs.ErrNotFound
 		}
 		if errors.Is(err, repository.ErrOptimisticLock) {
-			return nil, errs.New("CONFLICT", "version conflict", http.StatusConflict)
+			return nil, errs.New("CONFLICT", "version conflict",constx.StatusConflict)
 		}
 		return nil, err
 	}
@@ -233,3 +233,4 @@ func (s *TransactionService) Summary(ctx context.Context, userID uuid.UUID, from
 func (s *TransactionService) SummaryByCategory(ctx context.Context, userID uuid.UUID, from, to time.Time, currency string) (map[uuid.UUID]int64, error) {
 	return s.Transactions.SumExpensesByCategoryInRange(ctx, userID, from.UTC(), to.UTC(), stringx.Upper(currency))
 }
+

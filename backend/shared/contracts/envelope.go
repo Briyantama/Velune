@@ -1,7 +1,12 @@
 // Package contracts holds cross-service DTOs and event shapes. Keep stable for API versioning.
 package contracts
 
-import "github.com/google/uuid"
+import (
+	"encoding/json"
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // ErrorResponse is the standard JSON error body for REST APIs.
 type ErrorResponse struct {
@@ -25,4 +30,16 @@ type UserRef struct {
 type MoneyAmount struct {
 	AmountMinor int64  `json:"amountMinor"`
 	Currency    string `json:"currency"`
+}
+
+// EventEnvelope is the shared broker message envelope across services.
+type EventEnvelope struct {
+	EventID     uuid.UUID       `json:"eventId"`
+	EventType   string          `json:"eventType"`
+	Version     string          `json:"version,omitempty"`
+	Source      string          `json:"source"`
+	OccurredAt  time.Time       `json:"occurredAt"`
+	UserID      *uuid.UUID      `json:"userId,omitempty"`
+	Idempotency string          `json:"idempotencyKey,omitempty"`
+	Payload     json.RawMessage `json:"payload"`
 }

@@ -3,13 +3,13 @@ package usecase
 import (
 	"context"
 	"errors"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/legacy-api/internal/domain"
 	"github.com/moon-eye/velune/services/legacy-api/internal/repository"
+	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/pagination"
 )
@@ -32,7 +32,7 @@ type CreateBudgetInput struct {
 
 func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, in CreateBudgetInput) (*domain.Budget, error) {
 	if in.EndDate.Before(in.StartDate) {
-		return nil, errs.New("VALIDATION_ERROR", "end date must be on or after start date", http.StatusBadRequest)
+		return nil, errs.New("VALIDATION_ERROR", "end date must be on or after start date",constx.StatusBadRequest)
 	}
 	if in.CategoryID != nil {
 		c, err := s.Categories.GetByID(ctx, userID, *in.CategoryID)
@@ -40,7 +40,7 @@ func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, in CreateB
 			return nil, err
 		}
 		if c == nil {
-			return nil, errs.New("NOT_FOUND", "category not found", http.StatusNotFound)
+			return nil, errs.New("NOT_FOUND", "category not found",constx.StatusNotFound)
 		}
 	}
 	now := time.Now().UTC()
@@ -86,7 +86,7 @@ type UpdateBudgetInput struct {
 
 func (s *BudgetService) Update(ctx context.Context, userID, id uuid.UUID, version int64, in UpdateBudgetInput) (*domain.Budget, error) {
 	if in.EndDate.Before(in.StartDate) {
-		return nil, errs.New("VALIDATION_ERROR", "end date must be on or after start date", http.StatusBadRequest)
+		return nil, errs.New("VALIDATION_ERROR", "end date must be on or after start date",constx.StatusBadRequest)
 	}
 	b, err := s.Budgets.GetByID(ctx, userID, id)
 	if err != nil {
@@ -101,7 +101,7 @@ func (s *BudgetService) Update(ctx context.Context, userID, id uuid.UUID, versio
 			return nil, err
 		}
 		if c == nil {
-			return nil, errs.New("NOT_FOUND", "category not found", http.StatusNotFound)
+			return nil, errs.New("NOT_FOUND", "category not found",constx.StatusNotFound)
 		}
 	}
 	now := time.Now().UTC()
@@ -116,7 +116,7 @@ func (s *BudgetService) Update(ctx context.Context, userID, id uuid.UUID, versio
 	b.UpdatedAt = now
 	if err := s.Budgets.Update(ctx, b); err != nil {
 		if errors.Is(err, repository.ErrOptimisticLock) {
-			return nil, errs.New("CONFLICT", "version conflict", http.StatusConflict)
+			return nil, errs.New("CONFLICT", "version conflict",constx.StatusConflict)
 		}
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (s *BudgetService) Update(ctx context.Context, userID, id uuid.UUID, versio
 func (s *BudgetService) Delete(ctx context.Context, userID, id uuid.UUID, version int64) error {
 	err := s.Budgets.SoftDelete(ctx, userID, id, version)
 	if errors.Is(err, repository.ErrOptimisticLock) {
-		return errs.New("CONFLICT", "version conflict", http.StatusConflict)
+		return errs.New("CONFLICT", "version conflict",constx.StatusConflict)
 	}
 	return err
 }

@@ -169,3 +169,22 @@ func TestTransactionService_Update_VersionConflict(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "version conflict")
 }
+
+func TestTransactionService_Create_Success(t *testing.T) {
+	s := &usecase.TransactionService{
+		Ledger:       &mockLedger{},
+		Transactions: &noopTxRepo{},
+		Accounts:     &noopAccountRepo{},
+		Categories:   &mockCategoryRepo{},
+		Logger:       zap.NewNop(),
+	}
+	uid := uuid.New()
+	_, err := s.Create(context.Background(), uid, usecase.CreateTransactionInput{
+		AccountID:   uuid.New(),
+		AmountMinor: 100,
+		Currency:    "USD",
+		Type:        "expense",
+		OccurredAt:  time.Now(),
+	})
+	require.NoError(t, err)
+}
