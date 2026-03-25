@@ -15,6 +15,7 @@ import (
 	sharedlog "github.com/moon-eye/velune/shared/logger"
 	"github.com/moon-eye/velune/shared/metrics"
 	"github.com/moon-eye/velune/shared/middlewares"
+	"github.com/moon-eye/velune/shared/otelx"
 	"go.uber.org/zap"
 )
 
@@ -43,7 +44,7 @@ func main() {
 		})
 	})
 	addr := cfg.HTTPHost + ":" + cfg.HTTPPort
-	srv := &http.Server{Addr: addr, Handler: r, ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: addr, Handler: otelx.HTTPHandler(r, "http.server"), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		log.Info("listening", zap.String("addr", addr))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

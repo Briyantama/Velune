@@ -11,6 +11,7 @@ import (
 	httpx "github.com/moon-eye/velune/services/legacy-api/internal/delivery/http"
 	sharedconfig "github.com/moon-eye/velune/shared/config"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
+	"github.com/moon-eye/velune/shared/otelx"
 	"go.uber.org/zap"
 )
 
@@ -33,7 +34,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:              addr,
-		Handler:           httpx.NewRouter(),
+		Handler:           otelx.HTTPHandler(httpx.NewRouter(), "http.server"),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

@@ -14,6 +14,7 @@ import (
 	"github.com/moon-eye/velune/services/report-service/internal/usecase"
 	sharedconfig "github.com/moon-eye/velune/shared/config"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
+	"github.com/moon-eye/velune/shared/otelx"
 	"go.uber.org/zap"
 )
 
@@ -32,6 +33,16 @@ func main() {
 		log.Fatal("JWT_SECRET is required")
 	}
 
+	if err := otelx.Init(context.Background(), otelx.Options{ServiceName: cfg.ServiceName}); err != nil {
+		log.Fatal("otel_init", zap.Error(err))
+	}
+	defer func() {
+		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = otelx.Shutdown(sctx)
+	}()
+	log.Info("tracing_exporter", zap.String("mode", otelx.ExporterMode()))
+
 	txClient := transactions.New(cfg.TransactionServiceURL)
 	reportSvc := &usecase.ReportService{Transactions: txClient}
 	server := &httpapi.Server{
@@ -40,7 +51,7 @@ func main() {
 		Log:       log,
 		JWTSecret: cfg.JWTSecret,
 	}
-	handler := httpapi.NewRouter(server)
+	handler := otelx.HTTPHandler(httpapi.NewRouter(server), "http.server")
 
 	addr := cfg.HTTPHost + ":" + cfg.HTTPPort
 	httpServer := &http.Server{

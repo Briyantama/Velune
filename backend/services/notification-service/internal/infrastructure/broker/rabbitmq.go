@@ -12,6 +12,7 @@ import (
 	constx "github.com/moon-eye/velune/shared/constx"
 	"github.com/moon-eye/velune/shared/contracts"
 	errs "github.com/moon-eye/velune/shared/errors"
+	"github.com/moon-eye/velune/shared/otelx"
 	"github.com/moon-eye/velune/shared/sim"
 )
 
@@ -101,10 +102,13 @@ func (r *RabbitMQ) Publish(ctx context.Context, env contracts.EventEnvelope) err
 	if err != nil {
 		return err
 	}
+	headers := amqp.Table{}
+	otelx.InjectAMQP(ctx, headers)
 	return r.ch.PublishWithContext(ctx, r.exchange, r.routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		MessageId:   env.EventID.String(),
 		Timestamp:   time.Now().UTC(),
+		Headers:     headers,
 		Body:        body,
 	})
 }
@@ -127,6 +131,7 @@ func (r *RabbitMQ) Consume(ctx context.Context, handler func(context.Context, co
 				_ = msg.Nack(false, false)
 				continue
 			}
+			msgCtx := otelx.ExtractAMQP(ctx, msg.Headers)
 			herr := func() (err error) {
 				defer func() {
 					if rec := recover(); rec != nil {
@@ -143,7 +148,7 @@ func (r *RabbitMQ) Consume(ctx context.Context, handler func(context.Context, co
 				if r.sim != nil && r.sim.ConsumerPanic {
 					panic("SIMULATE_CONSUMER_PANIC")
 				}
-				return handler(ctx, env)
+				return handler(msgCtx, env)
 			}()
 			if herr != nil {
 				_ = msg.Nack(false, false)

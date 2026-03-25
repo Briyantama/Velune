@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
+	"github.com/moon-eye/velune/shared/otelx"
 )
 
 func ParsePageLimit(r *http.Request) (page, limit int) {
@@ -102,6 +103,7 @@ func singleHostReverseProxyWithTracing(u *url.URL) *httputil.ReverseProxy {
 		if rid, ok := RequestIDFromCtx(req.Context()); ok {
 			req.Header.Set("X-Request-ID", rid)
 		}
+		otelx.InjectHTTP(req.Context(), req.Header)
 	}
 	return proxy
 }
@@ -139,6 +141,7 @@ func MustProxyWithFallback(primaryURL, fallbackURL string) http.Handler {
 		if rid, ok := RequestIDFromCtx(req.Context()); ok {
 			req.Header.Set("X-Request-ID", rid)
 		}
+		otelx.InjectHTTP(req.Context(), req.Header)
 	}
 	var fallbackProxy http.Handler
 	if fallbackURL != "" {

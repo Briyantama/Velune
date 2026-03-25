@@ -13,6 +13,7 @@ import (
 	constx "github.com/moon-eye/velune/shared/constx"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/httpx"
+	"github.com/moon-eye/velune/shared/otelx"
 )
 
 type Client struct {
@@ -23,7 +24,7 @@ type Client struct {
 func New(baseURL string) *Client {
 	return &Client{
 		BaseURL: baseURL,
-		HTTP:    &http.Client{Timeout: 10 * time.Second},
+		HTTP:    otelx.TracedHTTPClient(&http.Client{Timeout: 10 * time.Second}),
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	db "github.com/moon-eye/velune/shared/sqlc/generated"
+	"github.com/moon-eye/velune/shared/otelx"
 )
 
 // Store holds shared database access for repositories and the ledger.
@@ -18,6 +19,7 @@ func NewStore(ctx context.Context, databaseURL string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	otelx.InstrumentPoolConfig(cfg)
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, err

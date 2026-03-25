@@ -22,6 +22,7 @@ import (
 	config "github.com/moon-eye/velune/shared/config"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
 	"github.com/moon-eye/velune/shared/metrics"
+	"github.com/moon-eye/velune/shared/otelx"
 	"github.com/moon-eye/velune/shared/sim"
 	"go.uber.org/zap"
 )
@@ -46,6 +47,16 @@ func main() {
 	if err := runMigrations(cfg.DatabaseURL, cfg.MigrationsPath); err != nil {
 		log.Fatal("migrations", zap.Error(err))
 	}
+
+	if err := otelx.Init(context.Background(), otelx.Options{ServiceName: cfg.ServiceName}); err != nil {
+		log.Fatal("otel_init", zap.Error(err))
+	}
+	defer func() {
+		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = otelx.Shutdown(sctx)
+	}()
+	log.Info("tracing_exporter", zap.String("mode", otelx.ExporterMode()))
 
 	store, err := postgres.NewStore(context.Background(), cfg.DatabaseURL)
 	if err != nil {
@@ -94,10 +105,10 @@ func main() {
 	}()
 	go jobWorker(context.Background(), overspend, postgres.NewJobRepo(store), cfg.OutboxBatchSize, cfg.OutboxMaxRetry, log)
 
-	handler := httpapi.NewRouter(&httpapi.Server{
+	handler := otelx.HTTPHandler(httpapi.NewRouter(&httpapi.Server{
 		Log:       log,
 		JWTSecret: cfg.JWTSecret,
-	})
+	}), "http.server")
 	addr := cfg.HTTPHost + ":" + cfg.HTTPPort
 	srv := &http.Server{
 		Addr:              addr,

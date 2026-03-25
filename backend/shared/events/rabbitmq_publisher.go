@@ -10,6 +10,7 @@ import (
 	"github.com/moon-eye/velune/shared/constx"
 	"github.com/moon-eye/velune/shared/contracts"
 	errs "github.com/moon-eye/velune/shared/errors"
+	"github.com/moon-eye/velune/shared/otelx"
 	"github.com/moon-eye/velune/shared/sim"
 )
 
@@ -78,10 +79,13 @@ func (p *RabbitPublisher) PublishDLQ(ctx context.Context, env contracts.EventEnv
 	if key == "" {
 		key = env.EventType
 	}
+	headers := amqp.Table{}
+	otelx.InjectAMQP(ctx, headers)
 	return p.ch.PublishWithContext(ctx, p.dlx, key, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		MessageId:   env.EventID.String(),
 		Timestamp:   time.Now().UTC(),
+		Headers:     headers,
 		Body:        body,
 	})
 }
@@ -98,10 +102,13 @@ func (p *RabbitPublisher) Publish(ctx context.Context, env contracts.EventEnvelo
 	if key == "" {
 		key = p.defaultRoutingKey
 	}
+	headers := amqp.Table{}
+	otelx.InjectAMQP(ctx, headers)
 	return p.ch.PublishWithContext(ctx, p.exchange, key, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		MessageId:   env.EventID.String(),
 		Timestamp:   time.Now().UTC(),
+		Headers:     headers,
 		Body:        body,
 	})
 }

@@ -24,6 +24,7 @@ import (
 	sharedlog "github.com/moon-eye/velune/shared/logger"
 	"github.com/moon-eye/velune/shared/httpx"
 	"github.com/moon-eye/velune/shared/metrics"
+	"github.com/moon-eye/velune/shared/otelx"
 	"github.com/moon-eye/velune/shared/middlewares"
 	db "github.com/moon-eye/velune/shared/sqlc/generated"
 	stringx "github.com/moon-eye/velune/shared/stringx"
@@ -49,7 +50,7 @@ func NewHandlers(cfg *config.Config, log *zap.Logger, txPool, bdPool, nfPool *pg
 		bdPool: bdPool,
 		nfPool: nfPool,
 		pub:    pub,
-		httpc:  &http.Client{Timeout: 8 * time.Second},
+		httpc:  otelx.TracedHTTPClient(&http.Client{Timeout: 8 * time.Second}),
 	}
 }
 

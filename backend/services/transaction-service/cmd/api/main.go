@@ -24,6 +24,7 @@ import (
 	"github.com/moon-eye/velune/shared/helper"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
 	"github.com/moon-eye/velune/shared/metrics"
+	"github.com/moon-eye/velune/shared/otelx"
 	"github.com/moon-eye/velune/shared/sim"
 	db "github.com/moon-eye/velune/shared/sqlc/generated"
 	stringx "github.com/moon-eye/velune/shared/stringx"
@@ -47,6 +48,16 @@ func main() {
 	if cfg.JWTSecret == "" {
 		log.Fatal("JWT_SECRET is required")
 	}
+
+	if err := otelx.Init(context.Background(), otelx.Options{ServiceName: cfg.ServiceName}); err != nil {
+		log.Fatal("otel_init", zap.Error(err))
+	}
+	defer func() {
+		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = otelx.Shutdown(sctx)
+	}()
+	log.Info("tracing_exporter", zap.String("mode", otelx.ExporterMode()))
 
 	ctx := context.Background()
 	if err := runMigrations(cfg.DatabaseURL, cfg.MigrationsPath); err != nil {
@@ -84,7 +95,7 @@ func main() {
 		DB:           store.Pool,
 	}
 
-	handler := httpapi.NewRouter(srv)
+	handler := otelx.HTTPHandler(httpapi.NewRouter(srv), "http.server")
 	addr := ":" + cfg.HTTPPort
 	httpServer := &http.Server{
 		Addr:              addr,

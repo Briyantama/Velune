@@ -17,6 +17,7 @@ import (
 	sharedlog "github.com/moon-eye/velune/shared/logger"
 	"github.com/moon-eye/velune/shared/metrics"
 	"github.com/moon-eye/velune/shared/middlewares"
+	"github.com/moon-eye/velune/shared/otelx"
 	"github.com/moon-eye/velune/shared/stringx"
 	"go.uber.org/zap"
 )
@@ -33,6 +34,16 @@ func main() {
 		log.Fatal("config", zap.Error(err))
 	}
 
+	if err := otelx.Init(context.Background(), otelx.Options{ServiceName: cfg.ServiceName}); err != nil {
+		log.Fatal("otel_init", zap.Error(err))
+	}
+	defer func() {
+		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = otelx.Shutdown(sctx)
+	}()
+	log.Info("tracing_exporter", zap.String("mode", otelx.ExporterMode()))
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", health)
 	mux.HandleFunc("GET /api/v1/gateway/routes", routesHandler(cfg))
@@ -43,7 +54,7 @@ func main() {
 
 	mux.HandleFunc("/api/v1/", catchAllHandler(cfg, log))
 
-	handler := middlewares.CorrelationIDHeader(instrumentGateway(cfg, log, mux))
+	handler := otelx.HTTPHandler(middlewares.CorrelationIDHeader(instrumentGateway(cfg, log, mux)), "http.server")
 
 	addr := cfg.HTTPHost + ":" + cfg.HTTPPort
 	srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second}

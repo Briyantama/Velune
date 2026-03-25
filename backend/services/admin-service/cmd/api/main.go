@@ -14,6 +14,7 @@ import (
 	httpapi "github.com/moon-eye/velune/services/admin-service/internal/delivery/http"
 	"github.com/moon-eye/velune/shared/events"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
+	"github.com/moon-eye/velune/shared/otelx"
 	"go.uber.org/zap"
 )
 
@@ -29,24 +30,34 @@ func main() {
 		log.Fatal("ADMIN_API_KEY is required for admin-service")
 	}
 
+	if err := otelx.Init(context.Background(), otelx.Options{ServiceName: "admin-service"}); err != nil {
+		log.Fatal("otel_init", zap.Error(err))
+	}
+	defer func() {
+		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = otelx.Shutdown(sctx)
+	}()
+	log.Info("tracing_exporter", zap.String("mode", otelx.ExporterMode()))
+
 	ctx := context.Background()
 	var txPool, bdPool, nfPool *pgxpool.Pool
 	if cfg.TransactionDBURL != "" {
-		txPool, err = pgxpool.New(ctx, cfg.TransactionDBURL)
+		txPool, err = connectPool(ctx, cfg.TransactionDBURL)
 		if err != nil {
 			log.Fatal("transaction db", zap.Error(err))
 		}
 		defer txPool.Close()
 	}
 	if cfg.BudgetDBURL != "" {
-		bdPool, err = pgxpool.New(ctx, cfg.BudgetDBURL)
+		bdPool, err = connectPool(ctx, cfg.BudgetDBURL)
 		if err != nil {
 			log.Fatal("budget db", zap.Error(err))
 		}
 		defer bdPool.Close()
 	}
 	if cfg.NotificationDBURL != "" {
-		nfPool, err = pgxpool.New(ctx, cfg.NotificationDBURL)
+		nfPool, err = connectPool(ctx, cfg.NotificationDBURL)
 		if err != nil {
 			log.Fatal("notification db", zap.Error(err))
 		}
@@ -68,7 +79,7 @@ func main() {
 	addr := cfg.HTTPHost + ":" + cfg.HTTPPort
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           h.Routes(),
+		Handler:           otelx.HTTPHandler(h.Routes(), "http.server"),
 		ReadHeaderTimeout: 15 * time.Second,
 		ReadTimeout:       60 * time.Second,
 		WriteTimeout:      60 * time.Second,
@@ -87,4 +98,13 @@ func main() {
 	shCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shCtx)
+}
+
+func connectPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	otelx.InstrumentPoolConfig(cfg)
+	return pgxpool.NewWithConfig(ctx, cfg)
 }
