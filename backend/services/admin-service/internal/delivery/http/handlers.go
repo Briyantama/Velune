@@ -14,20 +14,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/moon-eye/velune/services/admin-service/internal/config"
 	"github.com/moon-eye/velune/services/admin-service/internal/dlq"
 	"github.com/moon-eye/velune/shared/constx"
 	"github.com/moon-eye/velune/shared/contracts"
 	"github.com/moon-eye/velune/shared/events"
 	"github.com/moon-eye/velune/shared/helper"
-	sharedlog "github.com/moon-eye/velune/shared/logger"
 	"github.com/moon-eye/velune/shared/httpx"
+	sharedlog "github.com/moon-eye/velune/shared/logger"
 	"github.com/moon-eye/velune/shared/metrics"
-	"github.com/moon-eye/velune/shared/otelx"
 	"github.com/moon-eye/velune/shared/middlewares"
+	"github.com/moon-eye/velune/shared/otelx"
 	db "github.com/moon-eye/velune/shared/sqlc/generated"
 	stringx "github.com/moon-eye/velune/shared/stringx"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
 
@@ -93,12 +93,12 @@ func (h *Handlers) adminFields(r *http.Request, action string) []zap.Field {
 
 func (h *Handlers) dashboardHealth(w http.ResponseWriter, r *http.Request) {
 	svcs := map[string]string{
-		"auth":          h.probe(r.Context(), h.cfg.AuthServiceURL+"/health"),
-		"transaction":   h.probe(r.Context(), h.cfg.TransactionServiceURL+"/health"),
-		"budget":        h.probe(r.Context(), h.cfg.BudgetServiceURL+"/health"),
-		"report":        h.probe(r.Context(), h.cfg.ReportServiceURL+"/health"),
-		"notification":  h.probe(r.Context(), h.cfg.NotificationServiceURL+"/health"),
-		"category":      h.probe(r.Context(), h.cfg.CategoryServiceURL+"/api/v1/meta"),
+		"auth":         h.probe(r.Context(), h.cfg.AuthServiceURL+"/health"),
+		"transaction":  h.probe(r.Context(), h.cfg.TransactionServiceURL+"/health"),
+		"budget":       h.probe(r.Context(), h.cfg.BudgetServiceURL+"/health"),
+		"report":       h.probe(r.Context(), h.cfg.ReportServiceURL+"/health"),
+		"notification": h.probe(r.Context(), h.cfg.NotificationServiceURL+"/health"),
+		"category":     h.probe(r.Context(), h.cfg.CategoryServiceURL+"/api/v1/meta"),
 	}
 	outboxPending := 0
 	if h.txPool != nil {
@@ -128,10 +128,10 @@ func (h *Handlers) dashboardHealth(w http.ResponseWriter, r *http.Request) {
 		notifFail = int(n)
 	}
 	httpx.WriteJSON(w, constx.StatusOK, map[string]any{
-		"services":               svcs,
-		"outbox_pending":         outboxPending,
-		"dlq_messages":           dlqCount,
-		"notification_failures":  notifFail,
+		"services":              svcs,
+		"outbox_pending":        outboxPending,
+		"dlq_messages":          dlqCount,
+		"notification_failures": notifFail,
 	})
 }
 
@@ -615,10 +615,10 @@ func (h *Handlers) postEventsReplay(w http.ResponseWriter, r *http.Request) {
 		zap.Strings("errors", errs),
 	)...)
 	httpx.WriteJSON(w, constx.StatusOK, map[string]any{
-		"dry_run":   dry,
-		"replayed":  replayed,
-		"errors":    errs,
-		"window":    map[string]string{"from": fromT.Format(time.RFC3339), "to": toT.Format(time.RFC3339)},
+		"dry_run":    dry,
+		"replayed":   replayed,
+		"errors":     errs,
+		"window":     map[string]string{"from": fromT.Format(time.RFC3339), "to": toT.Format(time.RFC3339)},
 		"event_type": et,
 	})
 }

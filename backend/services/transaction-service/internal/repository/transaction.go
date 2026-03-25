@@ -9,12 +9,12 @@ import (
 )
 
 type TransactionFilter struct {
-	AccountID   *uuid.UUID
-	CategoryID  *uuid.UUID
-	Type        *domain.TransactionType
-	From        *time.Time
-	To          *time.Time
-	Currency    string
+	AccountID  *uuid.UUID
+	CategoryID *uuid.UUID
+	Type       *domain.TransactionType
+	From       *time.Time
+	To         *time.Time
+	Currency   string
 }
 
 type TransactionRepository interface {

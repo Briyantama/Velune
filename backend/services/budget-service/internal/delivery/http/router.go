@@ -17,11 +17,11 @@ import (
 )
 
 type Server struct {
-	Budgets *usecase.BudgetService
-	TxClient *txclient.Client
-	Validate *validator.Validate
-	Log      *zap.Logger
-	JWTSecret string
+	Budgets          *usecase.BudgetService
+	TxClient         *txclient.Client
+	Validate         *validator.Validate
+	Log              *zap.Logger
+	JWTSecret        string
 	AdminInternalKey string
 	DB               *pgxpool.Pool
 }

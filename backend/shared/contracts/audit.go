@@ -4,7 +4,7 @@ import "github.com/google/uuid"
 
 const (
 	EventBalanceMismatchDetected = "balance.mismatch.detected"
-	EventBudgetMismatchDetected = "budget.mismatch.detected"
+	EventBudgetMismatchDetected  = "budget.mismatch.detected"
 )
 
 // BalanceMismatchDetected is emitted when stored account balance disagrees with ledger sum.

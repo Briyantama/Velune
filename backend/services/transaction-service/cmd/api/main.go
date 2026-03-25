@@ -84,15 +84,15 @@ func main() {
 
 	v := validator.New()
 	srv := &httpapi.Server{
-		Accounts:     &usecase.AccountService{Accounts: accountRepo},
-		Categories:   &usecase.CategoryService{Categories: categoryRepo},
-		Transactions: &usecase.TransactionService{Ledger: ledger, Transactions: txRepo, Accounts: accountRepo, Categories: categoryRepo, Logger: log},
-		Recurring:    &usecase.RecurringService{Recurring: recurringRepo, Accounts: accountRepo, Categories: categoryRepo},
-		Validate:     v,
-		Log:          log,
-		JWTSecret:    cfg.JWTSecret,
+		Accounts:         &usecase.AccountService{Accounts: accountRepo},
+		Categories:       &usecase.CategoryService{Categories: categoryRepo},
+		Transactions:     &usecase.TransactionService{Ledger: ledger, Transactions: txRepo, Accounts: accountRepo, Categories: categoryRepo, Logger: log},
+		Recurring:        &usecase.RecurringService{Recurring: recurringRepo, Accounts: accountRepo, Categories: categoryRepo},
+		Validate:         v,
+		Log:              log,
+		JWTSecret:        cfg.JWTSecret,
 		AdminInternalKey: stringx.TrimSpace(os.Getenv("ADMIN_INTERNAL_KEY")),
-		DB:           store.Pool,
+		DB:               store.Pool,
 	}
 
 	handler := otelx.HTTPHandler(httpapi.NewRouter(srv), "http.server")

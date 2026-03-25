@@ -12,9 +12,9 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/moon-eye/velune/services/auth-service/internal/domain"
 	"github.com/moon-eye/velune/services/auth-service/internal/repository"
+	"github.com/moon-eye/velune/services/auth-service/internal/usecase"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/jwt"
-	"github.com/moon-eye/velune/services/auth-service/internal/usecase"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -46,15 +46,15 @@ func (m *mockUserRepo) GetByEmail(ctx context.Context, email string) (*domain.Us
 }
 
 type rotateCall struct {
-	tokenID     uuid.UUID
+	tokenID      uuid.UUID
 	newTokenHash string
 	newExpiresAt time.Time
 }
 
 type mockRefreshRepo struct {
-	storeFn   func(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) error
-	getByHashFn func(ctx context.Context, tokenHash string) (*domain.RefreshToken, error)
-	rotateFn  func(ctx context.Context, tokenID uuid.UUID, newTokenHash string, newExpiresAt time.Time) error
+	storeFn      func(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) error
+	getByHashFn  func(ctx context.Context, tokenHash string) (*domain.RefreshToken, error)
+	rotateFn     func(ctx context.Context, tokenID uuid.UUID, newTokenHash string, newExpiresAt time.Time) error
 	softDeleteFn func(ctx context.Context, tokenID uuid.UUID) error
 
 	rotateCalls []rotateCall
@@ -262,10 +262,10 @@ func TestLogin_InvalidPassword_ReturnsStableCode(t *testing.T) {
 	userRepo := &mockUserRepo{
 		getByEmailFn: func(ctx context.Context, email string) (*domain.User, error) {
 			return &domain.User{
-				ID:            userID,
-				Email:         email,
+				ID:           userID,
+				Email:        email,
 				PasswordHash: string(hash),
-				BaseCurrency:  "USD",
+				BaseCurrency: "USD",
 			}, nil
 		},
 	}
@@ -309,10 +309,10 @@ func TestRefresh_RotatesAndReturnsNewTokens(t *testing.T) {
 	oldHash := sha256Hex(oldRefreshToken)
 
 	newUser := &domain.User{
-		ID:            userID,
-		Email:         "user@example.com",
+		ID:           userID,
+		Email:        "user@example.com",
 		PasswordHash: "irrelevant",
-		BaseCurrency:  "USD",
+		BaseCurrency: "USD",
 	}
 
 	var rotatedTokenHash string
@@ -323,13 +323,13 @@ func TestRefresh_RotatesAndReturnsNewTokens(t *testing.T) {
 				t.Fatalf("expected token hash %s, got %s", oldHash, tokenHash)
 			}
 			return &domain.RefreshToken{
-				ID:         existingTokenID,
-				UserID:     userID,
-				TokenHash:  oldHash,
-				ExpiresAt:  time.Now().UTC().Add(refreshTTL / 2),
-				CreatedAt:  time.Now().UTC(),
-				UpdatedAt:  time.Now().UTC(),
-				Version:    1,
+				ID:        existingTokenID,
+				UserID:    userID,
+				TokenHash: oldHash,
+				ExpiresAt: time.Now().UTC().Add(refreshTTL / 2),
+				CreatedAt: time.Now().UTC(),
+				UpdatedAt: time.Now().UTC(),
+				Version:   1,
 			}, nil
 		},
 		rotateFn: func(ctx context.Context, tokenID uuid.UUID, newTokenHash string, newExpiresAt time.Time) error {
@@ -389,10 +389,10 @@ func TestRefresh_RotatesAndReturnsNewTokens(t *testing.T) {
 func TestRefresh_InvalidToken_ReturnsStableCode(t *testing.T) {
 	ctx := context.Background()
 	svc := &usecase.AuthService{
-		JWTSecret:   "test-secret",
-		AccessTTL:   1 * time.Hour,
+		JWTSecret:  "test-secret",
+		AccessTTL:  1 * time.Hour,
 		RefreshTTL: 30 * 24 * time.Hour,
-		Users:       &mockUserRepo{},
+		Users:      &mockUserRepo{},
 		RefreshTokens: &mockRefreshRepo{
 			getByHashFn: func(ctx context.Context, tokenHash string) (*domain.RefreshToken, error) {
 				return nil, nil
@@ -417,4 +417,3 @@ func TestRefresh_InvalidToken_ReturnsStableCode(t *testing.T) {
 var _ repository.UserRepository = (*mockUserRepo)(nil)
 var _ repository.RefreshTokenRepository = (*mockRefreshRepo)(nil)
 var _ = pgconn.PgError{} // avoid unused imports if build tags change
-

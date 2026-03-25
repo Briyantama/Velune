@@ -4,20 +4,20 @@ Multi-service **Expense Tracker / Money Manager** backend: independent deployabl
 
 ## Layout
 
-| Path | Purpose |
-| ---- | ------- |
-| `go.work` | Go workspace — open this folder in the IDE; build/test per module |
-| `shared/` | Common libraries: `config`, `logger`, `errors` (errs), `jwt`, `pagination`, `money`, `contracts` |
-| `services/auth-service` | Identity, JWT access/refresh, password hashing ([docs](services/auth-service/README.md)) |
-| `services/transaction-service` | Ledger source of truth: accounts, categories, transactions, recurring, summaries ([docs](services/transaction-service/README.md)) |
-| `services/category-service` | Categories (legacy scaffold; `/api/v1/categories` now routed to transaction-service) |
-| `services/budget-service` | Budgets + budget usage/overspend via transaction contracts ([docs](services/budget-service/README.md)) |
-| `services/report-service` | Read-only analytics service for `/api/v1/reports/*`; consumes transaction contracts ([docs](services/report-service/README.md)) |
-| `services/notification-service` | Event-driven overspend delivery via RabbitMQ (in-app + conditional email) ([docs](services/notification-service/README.md)) |
-| `services/api-gateway` | HTTP entry: routes `/api/v1/*` to upstreams or `LEGACY_API_URL` |
-| `services/legacy-api` | **Current full API** (clean architecture) until domains are extracted |
-| `infra/` | Docker Compose, Postgres init scripts |
-| `deploy/` | Deployment notes |
+| Path                            | Purpose                                                                                                                           |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `go.work`                       | Go workspace — open this folder in the IDE; build/test per module                                                                 |
+| `shared/`                       | Common libraries: `config`, `logger`, `errors` (errs), `jwt`, `pagination`, `contracts`, …                                        |
+| `services/auth-service`         | Identity, JWT access/refresh, password hashing ([docs](services/auth-service/README.md))                                          |
+| `services/transaction-service`  | Ledger source of truth: accounts, categories, transactions, recurring, summaries ([docs](services/transaction-service/README.md)) |
+| `services/category-service`     | Categories (legacy scaffold; `/api/v1/categories` now routed to transaction-service)                                              |
+| `services/budget-service`       | Budgets + budget usage/overspend via transaction contracts ([docs](services/budget-service/README.md))                            |
+| `services/report-service`       | Read-only analytics service for `/api/v1/reports/*`; consumes transaction contracts ([docs](services/report-service/README.md))   |
+| `services/notification-service` | Event-driven overspend delivery via RabbitMQ (in-app + conditional email) ([docs](services/notification-service/README.md))       |
+| `services/api-gateway`          | HTTP entry: routes `/api/v1/*` to upstreams or `LEGACY_API_URL`                                                                   |
+| `services/legacy-api`           | **Current full API** (clean architecture) until domains are extracted                                                             |
+| `infra/`                        | Docker Compose, Postgres init scripts                                                                                             |
+| `deploy/`                       | Deployment notes                                                                                                                  |
 
 ## Principles
 

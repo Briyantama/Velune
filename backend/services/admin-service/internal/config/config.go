@@ -12,24 +12,24 @@ type Config struct {
 	HTTPHost string
 	HTTPPort string
 
-	AdminAPIKey        string
-	AdminInternalKey   string
-	TransactionDBURL   string
-	BudgetDBURL        string
-	NotificationDBURL  string
-	BrokerURL          string
-	BrokerExchange     string
-	BrokerDLX          string
+	AdminAPIKey         string
+	AdminInternalKey    string
+	TransactionDBURL    string
+	BudgetDBURL         string
+	NotificationDBURL   string
+	BrokerURL           string
+	BrokerExchange      string
+	BrokerDLX           string
 	BrokerDLQ           string
 	BrokerRoutingKey    string
 	BrokerDLQRoutingKey string
 
-	AuthServiceURL          string
-	TransactionServiceURL   string
-	CategoryServiceURL      string
-	BudgetServiceURL        string
-	ReportServiceURL        string
-	NotificationServiceURL  string
+	AuthServiceURL         string
+	TransactionServiceURL  string
+	CategoryServiceURL     string
+	BudgetServiceURL       string
+	ReportServiceURL       string
+	NotificationServiceURL string
 }
 
 func Load() *Config {

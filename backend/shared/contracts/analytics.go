@@ -24,13 +24,6 @@ type TransactionCategoryTotalsResponse struct {
 	Breakdown []TransactionCategorySummary `json:"breakdown"`
 }
 
-type CashFlowPoint struct {
-	At           time.Time `json:"at"`
-	IncomeMinor  int64     `json:"incomeMinor"`
-	ExpenseMinor int64     `json:"expenseMinor"`
-	NetMinor     int64     `json:"netMinor"`
-}
-
 type MonthlyCategoryBreakdownDTO struct {
 	CategoryID   *uuid.UUID `json:"categoryId,omitempty"`
 	CategoryName string     `json:"categoryName"`

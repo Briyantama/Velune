@@ -19,7 +19,7 @@ type CategoryService struct {
 }
 
 type CreateCategoryInput struct {
-	Name     string     `validate:"required,min=1,max=200"`
+	Name     string `validate:"required,min=1,max=200"`
 	ParentID *uuid.UUID
 }
 
@@ -55,7 +55,7 @@ func (s *CategoryService) List(ctx context.Context, userID uuid.UUID, page, limi
 }
 
 type UpdateCategoryInput struct {
-	Name     string     `validate:"required,min=1,max=200"`
+	Name     string `validate:"required,min=1,max=200"`
 	ParentID *uuid.UUID
 }
 

@@ -21,14 +21,14 @@ type RecurringService struct {
 }
 
 type CreateRecurringInput struct {
-	AccountID     uuid.UUID  `validate:"required"`
-	CategoryID    *uuid.UUID
-	AmountMinor   int64      `validate:"min=1"`
-	Currency      string     `validate:"required,len=3"`
-	Type          string     `validate:"required,oneof=income expense"`
-	Frequency     string     `validate:"required,oneof=daily weekly monthly yearly"`
-	NextRunAt     time.Time  `validate:"required"`
-	Description   string     `validate:"max=2000"`
+	AccountID   uuid.UUID `validate:"required"`
+	CategoryID  *uuid.UUID
+	AmountMinor int64     `validate:"min=1"`
+	Currency    string    `validate:"required,len=3"`
+	Type        string    `validate:"required,oneof=income expense"`
+	Frequency   string    `validate:"required,oneof=daily weekly monthly yearly"`
+	NextRunAt   time.Time `validate:"required"`
+	Description string    `validate:"max=2000"`
 }
 
 func (s *RecurringService) Create(ctx context.Context, userID uuid.UUID, in CreateRecurringInput) (*domain.RecurringRule, error) {

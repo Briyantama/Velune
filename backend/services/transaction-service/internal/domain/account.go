@@ -9,11 +9,11 @@ import (
 type AccountType string
 
 const (
-	AccountWallet   AccountType = "wallet"
-	AccountBank     AccountType = "bank"
-	AccountEMoney   AccountType = "e_money"
-	AccountCash     AccountType = "cash"
-	AccountCard     AccountType = "card"
+	AccountWallet AccountType = "wallet"
+	AccountBank   AccountType = "bank"
+	AccountEMoney AccountType = "e_money"
+	AccountCash   AccountType = "cash"
+	AccountCard   AccountType = "card"
 )
 
 type Account struct {

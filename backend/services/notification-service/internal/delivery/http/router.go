@@ -35,9 +35,9 @@ func NewRouter(s *Server) http.Handler {
 }
 
 func health(w http.ResponseWriter, _ *http.Request) {
-	httpx.WriteJSON(w,constx.StatusOK, map[string]string{"status": "ok"})
+	httpx.WriteJSON(w, constx.StatusOK, map[string]string{"status": "ok"})
 }
 
 func ping(w http.ResponseWriter, _ *http.Request) {
-	httpx.WriteJSON(w,constx.StatusOK, map[string]string{"status": "accepted"})
+	httpx.WriteJSON(w, constx.StatusOK, map[string]string{"status": "accepted"})
 }

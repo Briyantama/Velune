@@ -15,17 +15,17 @@ const (
 )
 
 type Budget struct {
-	ID              uuid.UUID
-	UserID          uuid.UUID
-	Name            string
-	PeriodType      BudgetPeriod
-	CategoryID      *uuid.UUID
-	StartDate       time.Time
-	EndDate         time.Time
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	Name             string
+	PeriodType       BudgetPeriod
+	CategoryID       *uuid.UUID
+	StartDate        time.Time
+	EndDate          time.Time
 	LimitAmountMinor int64
-	Currency        string
-	Version         int64
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	DeletedAt       *time.Time
+	Currency         string
+	Version          int64
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	DeletedAt        *time.Time
 }

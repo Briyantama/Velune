@@ -8,15 +8,15 @@ import (
 
 // TransactionCreated is an integration-safe event payload shape.
 type TransactionCreated struct {
-	TransactionID uuid.UUID `json:"transactionId"`
-	UserID        uuid.UUID `json:"userId"`
-	AccountID     uuid.UUID `json:"accountId"`
+	TransactionID uuid.UUID  `json:"transactionId"`
+	UserID        uuid.UUID  `json:"userId"`
+	AccountID     uuid.UUID  `json:"accountId"`
 	CategoryID    *uuid.UUID `json:"categoryId,omitempty"`
-	AmountMinor   int64     `json:"amountMinor"`
-	Currency      string    `json:"currency"`
-	Type          string    `json:"type"`
-	OccurredAt    time.Time `json:"occurredAt"`
-	Version       int64     `json:"version"`
+	AmountMinor   int64      `json:"amountMinor"`
+	Currency      string     `json:"currency"`
+	Type          string     `json:"type"`
+	OccurredAt    time.Time  `json:"occurredAt"`
+	Version       int64      `json:"version"`
 }
 
 type TransactionUpdated struct {
@@ -37,12 +37,12 @@ type TransactionDeleted struct {
 }
 
 type TransactionSummary struct {
-	From        time.Time `json:"from"`
-	To          time.Time `json:"to"`
-	Currency    string    `json:"currency"`
-	IncomeMinor int64     `json:"incomeMinor"`
-	ExpenseMinor int64    `json:"expenseMinor"`
-	NetMinor    int64     `json:"netMinor"`
+	From         time.Time `json:"from"`
+	To           time.Time `json:"to"`
+	Currency     string    `json:"currency"`
+	IncomeMinor  int64     `json:"incomeMinor"`
+	ExpenseMinor int64     `json:"expenseMinor"`
+	NetMinor     int64     `json:"netMinor"`
 }
 
 type BudgetRelevantTransaction struct {
@@ -52,10 +52,9 @@ type BudgetRelevantTransaction struct {
 }
 
 type BalanceSnapshot struct {
-	UserID      uuid.UUID `json:"userId"`
-	AccountID   uuid.UUID `json:"accountId"`
-	BalanceMinor int64    `json:"balanceMinor"`
-	Currency    string    `json:"currency"`
-	AsOf        time.Time `json:"asOf"`
+	UserID       uuid.UUID `json:"userId"`
+	AccountID    uuid.UUID `json:"accountId"`
+	BalanceMinor int64     `json:"balanceMinor"`
+	Currency     string    `json:"currency"`
+	AsOf         time.Time `json:"asOf"`
 }
-

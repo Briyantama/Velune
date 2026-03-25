@@ -143,4 +143,3 @@ func transactionFromListRow(r db.TransactionListRow) *domain.Transaction {
 		DeletedAt:             helper.FromPgTSPtr(r.DeletedAt),
 	}
 }
-

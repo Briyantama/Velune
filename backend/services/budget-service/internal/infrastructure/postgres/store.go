@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	db "github.com/moon-eye/velune/shared/sqlc/generated"
 	"github.com/moon-eye/velune/shared/otelx"
+	db "github.com/moon-eye/velune/shared/sqlc/generated"
 )
 
 // Store holds shared database access for repositories and the ledger.

@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/moon-eye/velune/services/budget-service/internal/domain"
 	"github.com/moon-eye/velune/services/budget-service/internal/repository"
-	"github.com/moon-eye/velune/shared/contracts"
 	constx "github.com/moon-eye/velune/shared/constx"
+	"github.com/moon-eye/velune/shared/contracts"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/helper"
 	"github.com/moon-eye/velune/shared/httpx"
@@ -41,7 +41,7 @@ type CreateBudgetInput struct {
 
 func (s *BudgetService) Create(ctx context.Context, userID uuid.UUID, in CreateBudgetInput) (*domain.Budget, error) {
 	if in.EndDate.Before(in.StartDate) {
-		return nil, errs.New("VALIDATION_ERROR", "end date must be on or after start date",constx.StatusBadRequest)
+		return nil, errs.New("VALIDATION_ERROR", "end date must be on or after start date", constx.StatusBadRequest)
 	}
 	now := time.Now().UTC()
 	b := &domain.Budget{
@@ -86,7 +86,7 @@ type UpdateBudgetInput struct {
 
 func (s *BudgetService) Update(ctx context.Context, userID, id uuid.UUID, version int64, in UpdateBudgetInput) (*domain.Budget, error) {
 	if in.EndDate.Before(in.StartDate) {
-		return nil, errs.New("VALIDATION_ERROR", "end date must be on or after start date",constx.StatusBadRequest)
+		return nil, errs.New("VALIDATION_ERROR", "end date must be on or after start date", constx.StatusBadRequest)
 	}
 	b, err := s.Budgets.GetByID(ctx, userID, id)
 	if err != nil {
@@ -107,7 +107,7 @@ func (s *BudgetService) Update(ctx context.Context, userID, id uuid.UUID, versio
 	b.UpdatedAt = now
 	if err := s.Budgets.Update(ctx, b); err != nil {
 		if errors.Is(err, repository.ErrOptimisticLock) {
-			return nil, errs.New("CONFLICT", "version conflict",constx.StatusConflict)
+			return nil, errs.New("CONFLICT", "version conflict", constx.StatusConflict)
 		}
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func (s *BudgetService) Update(ctx context.Context, userID, id uuid.UUID, versio
 func (s *BudgetService) Delete(ctx context.Context, userID, id uuid.UUID, version int64) error {
 	err := s.Budgets.SoftDelete(ctx, userID, id, version)
 	if errors.Is(err, repository.ErrOptimisticLock) {
-		return errs.New("CONFLICT", "version conflict",constx.StatusConflict)
+		return errs.New("CONFLICT", "version conflict", constx.StatusConflict)
 	}
 	return err
 }
@@ -143,7 +143,7 @@ func (s *BudgetService) Usage(ctx context.Context, userID, budgetID uuid.UUID) (
 		return nil, errs.ErrNotFound
 	}
 	if s.Transactions == nil {
-		return nil, errs.New("UPSTREAM_UNAVAILABLE", "transaction summary client not configured",constx.StatusServiceUnavailable)
+		return nil, errs.New("UPSTREAM_UNAVAILABLE", "transaction summary client not configured", constx.StatusServiceUnavailable)
 	}
 
 	var spent int64

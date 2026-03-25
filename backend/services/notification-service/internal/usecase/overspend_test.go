@@ -42,10 +42,12 @@ func (m *mockJobs) Enqueue(_ context.Context, job *repository.NotificationJob) e
 	m.jobs = append(m.jobs, *job)
 	return nil
 }
-func (m *mockJobs) FetchDue(_ context.Context, _ int) ([]repository.NotificationJob, error) { return nil, nil }
-func (m *mockJobs) MarkSent(_ context.Context, _ uuid.UUID) error                             { return nil }
-func (m *mockJobs) MarkRetry(_ context.Context, _ uuid.UUID, _ int, _ time.Time) error        { return nil }
-func (m *mockJobs) MarkFailed(_ context.Context, _ uuid.UUID) error                            { return nil }
+func (m *mockJobs) FetchDue(_ context.Context, _ int) ([]repository.NotificationJob, error) {
+	return nil, nil
+}
+func (m *mockJobs) MarkSent(_ context.Context, _ uuid.UUID) error                      { return nil }
+func (m *mockJobs) MarkRetry(_ context.Context, _ uuid.UUID, _ int, _ time.Time) error { return nil }
+func (m *mockJobs) MarkFailed(_ context.Context, _ uuid.UUID) error                    { return nil }
 
 func TestOverspendChannelsByThreshold(t *testing.T) {
 	inApp := &mockChannel{}

@@ -22,7 +22,7 @@ func TestMonthlyValidation_MissingYear(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	if rec.Code != constx.StatusBadRequest {
-		t.Fatalf("expected %d got %d",constx.StatusBadRequest, rec.Code)
+		t.Fatalf("expected %d got %d", constx.StatusBadRequest, rec.Code)
 	}
 }
 
@@ -37,6 +37,6 @@ func TestMonthlyValidation_MissingAuth(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	if rec.Code != constx.StatusUnauthorized {
-		t.Fatalf("expected %d got %d",constx.StatusUnauthorized, rec.Code)
+		t.Fatalf("expected %d got %d", constx.StatusUnauthorized, rec.Code)
 	}
 }

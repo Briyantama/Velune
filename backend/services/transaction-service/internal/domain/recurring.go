@@ -16,20 +16,20 @@ const (
 )
 
 type RecurringRule struct {
-	ID            uuid.UUID
-	UserID        uuid.UUID
-	AccountID     uuid.UUID
-	CategoryID    *uuid.UUID
-	AmountMinor   int64
-	Currency      string
-	Type          TransactionType
-	Frequency     RecurringFrequency
-	NextRunAt     time.Time
-	LastRunAt     *time.Time
-	IsActive      bool
-	Description   string
-	Version       int64
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	DeletedAt     *time.Time
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	AccountID   uuid.UUID
+	CategoryID  *uuid.UUID
+	AmountMinor int64
+	Currency    string
+	Type        TransactionType
+	Frequency   RecurringFrequency
+	NextRunAt   time.Time
+	LastRunAt   *time.Time
+	IsActive    bool
+	Description string
+	Version     int64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 }

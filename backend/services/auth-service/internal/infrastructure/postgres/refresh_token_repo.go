@@ -57,14 +57,14 @@ func (r *RefreshTokenRepo) GetByTokenHash(ctx context.Context, tokenHash string)
 	}
 
 	return &domain.RefreshToken{
-		ID:         uuid.UUID(rr.ID.Bytes),
-		UserID:     uuid.UUID(rr.UserID.Bytes),
-		TokenHash:  rr.TokenHash,
-		ExpiresAt:  rr.ExpiresAt.Time,
-		Version:    rr.Version,
-		CreatedAt:  rr.CreatedAt.Time,
-		UpdatedAt:  rr.UpdatedAt.Time,
-		DeletedAt:  deletedAt,
+		ID:        uuid.UUID(rr.ID.Bytes),
+		UserID:    uuid.UUID(rr.UserID.Bytes),
+		TokenHash: rr.TokenHash,
+		ExpiresAt: rr.ExpiresAt.Time,
+		Version:   rr.Version,
+		CreatedAt: rr.CreatedAt.Time,
+		UpdatedAt: rr.UpdatedAt.Time,
+		DeletedAt: deletedAt,
 	}, nil
 }
 
