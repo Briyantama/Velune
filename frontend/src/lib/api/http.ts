@@ -1,0 +1,58 @@
+import { serverEnv } from "@/src/lib/env/server";
+import type { BackendError } from "@/src/lib/api/backend-types";
+import { SafeJson } from "../utils";
+
+export class ApiError extends Error {
+  code: string;
+  status: number;
+
+  constructor(init: { code: string; message: string; status: number }) {
+    super(init.message);
+    this.code = init.code;
+    this.status = init.status;
+  }
+}
+
+export function ensureCorrelationId(inbound?: string | null): string {
+  const v = (inbound ?? "").trim();
+  return v || crypto.randomUUID();
+}
+
+export async function gatewayFetch(input: {
+  path: string;
+  method: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  accessToken?: string;
+  correlationId?: string;
+  cache?: RequestCache;
+}): Promise<Response> {
+  const url = new URL(serverEnv.gatewayBaseUrl + input.path);
+  const headers = new Headers(input.headers ?? {});
+  headers.set("Accept", "application/json");
+  headers.set("Content-Type", "application/json");
+  if (input.correlationId) headers.set("X-Correlation-ID", input.correlationId);
+  if (input.accessToken) headers.set("Authorization", `Bearer ${input.accessToken}`);
+
+  return fetch(url, {
+    method: input.method,
+    headers,
+    body: input.body === undefined ? undefined : JSON.stringify(input.body),
+    cache: input.cache ?? "no-store"
+  });
+}
+
+export async function readJsonOrThrow<T>(resp: Response): Promise<T> {
+  const text = await resp.text();
+  const json = text ? SafeJson(text) : undefined;
+
+  if (resp.ok) {
+    return json as T;
+  }
+
+  const be = (json ?? {}) as Partial<BackendError>;
+  const code = typeof be.code === "string" && be.code ? be.code : "HTTP_ERROR";
+  const message =
+    typeof be.message === "string" && be.message ? be.message : `Request failed (${resp.status})`;
+  throw new ApiError({ code, message, status: resp.status });
+}

@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    /* Finance-blue/teal primary (calm + premium) */
+    --primary: 187 78% 33%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 16% 47%;
+    /* Soft teal accent for hover/surface tint */
+    --accent: 187 35% 92%;
+    --accent-foreground: 222 47% 11%;
+    /* Semantic statuses */
+    --success: 152 55% 38%;
+    --success-foreground: 210 40% 98%;
+    --warning: 45 95% 48%;
+    --warning-foreground: 222 47% 11%;
+    --info: 196 88% 35%;
+    --info-foreground: 210 40% 98%;
+    /* Back-compat: destructive == error */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --error: var(--destructive);
+    --error-foreground: var(--destructive-foreground);
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 187 78% 33%;
+    --radius: 14px;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 187 78% 58%;
+    --primary-foreground: 222 47% 7%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 187 45% 22%;
+    --accent-foreground: 210 40% 98%;
+    --success: 152 55% 55%;
+    --success-foreground: 210 40% 98%;
+    --warning: 45 95% 60%;
+    --warning-foreground: 222 47% 7%;
+    --info: 196 88% 60%;
+    --info-foreground: 210 40% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --error: var(--destructive);
+    --error-foreground: var(--destructive-foreground);
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 187 78% 58%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
