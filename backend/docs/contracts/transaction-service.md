@@ -4,27 +4,27 @@
 
 Source: `services/transaction-service/internal/delivery/http/router.go`.
 
-| Method | Path |
-|--------|------|
-| GET | `/health` |
-| GET | `/metrics` |
-| POST | `/internal/admin/reconcile/balance` | Admin API key |
-| * | `/api/v1/accounts`, `/api/v1/categories`, `/api/v1/transactions`, `/api/v1/recurring` | JWT; CRUD per `router.go` |
-| GET | `/api/v1/transactions/summary` |
-| GET | `/api/v1/transactions/summary/categories` |
+| Method | Path                                                                                  |
+| ------ | ------------------------------------------------------------------------------------- | ------------------------- |
+| GET    | `/health`                                                                             |
+| GET    | `/metrics`                                                                            |
+| POST   | `/internal/admin/reconcile/balance`                                                   | Admin API key             |
+| \*     | `/api/v1/accounts`, `/api/v1/categories`, `/api/v1/transactions`, `/api/v1/recurring` | JWT; CRUD per `router.go` |
+| GET    | `/api/v1/transactions/summary`                                                        |
+| GET    | `/api/v1/transactions/summary/categories`                                             |
 
 OpenAPI: TBD.
 
 ## Events
 
-| Produced | Transport | Insert sites |
-|----------|-----------|--------------|
-| `transaction.created` / `transaction.updated` / `transaction.deleted` | Outbox → RabbitMQ | `internal/infrastructure/postgres/ledger.go` |
-| `balance.mismatch.detected` | Outbox (reconciliation) | `internal/reconciliation/balance.go` |
+| Produced                                                              | Transport               | Insert sites                                 |
+| --------------------------------------------------------------------- | ----------------------- | -------------------------------------------- |
+| `transaction.created` / `transaction.updated` / `transaction.deleted` | Outbox → RabbitMQ       | `internal/infrastructure/postgres/ledger.go` |
+| `balance.mismatch.detected`                                           | Outbox (reconciliation) | `internal/reconciliation/balance.go`         |
 
 | Consumed | Notes |
-|----------|-------|
-| None | |
+| -------- | ----- |
+| None     |       |
 
 Routing keys follow `EventType` (topic exchange).
 

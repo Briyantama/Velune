@@ -4,33 +4,33 @@
 
 Source: `services/admin-service/internal/delivery/http/handlers.go` (`Routes()`).
 
-| Method | Path | Auth |
-|--------|------|------|
-| GET | `/health` | Public |
-| GET | `/metrics` | Public |
-| GET | `/internal/admin/health` | `ADMIN_API_KEY` |
-| GET | `/internal/admin/dlq` | |
-| POST | `/internal/admin/dlq/replay` | |
-| GET | `/internal/admin/outbox` | |
-| POST | `/internal/admin/outbox/retry` | |
-| GET | `/internal/admin/notifications/jobs` | |
-| POST | `/internal/admin/notifications/jobs/retry` | |
-| POST | `/internal/admin/reconcile/balance` | |
-| POST | `/internal/admin/reconcile/budget` | |
-| GET | `/internal/admin/reconcile/logs` | |
-| POST | `/internal/admin/events/replay` | |
+| Method | Path                                       | Auth            |
+| ------ | ------------------------------------------ | --------------- |
+| GET    | `/health`                                  | Public          |
+| GET    | `/metrics`                                 | Public          |
+| GET    | `/internal/admin/health`                   | `ADMIN_API_KEY` |
+| GET    | `/internal/admin/dlq`                      |                 |
+| POST   | `/internal/admin/dlq/replay`               |                 |
+| GET    | `/internal/admin/outbox`                   |                 |
+| POST   | `/internal/admin/outbox/retry`             |                 |
+| GET    | `/internal/admin/notifications/jobs`       |                 |
+| POST   | `/internal/admin/notifications/jobs/retry` |                 |
+| POST   | `/internal/admin/reconcile/balance`        |                 |
+| POST   | `/internal/admin/reconcile/budget`         |                 |
+| GET    | `/internal/admin/reconcile/logs`           |                 |
+| POST   | `/internal/admin/events/replay`            |                 |
 
 OpenAPI: TBD.
 
 ## Events
 
-| Produced | Notes |
-|----------|-------|
+| Produced                  | Notes                                                               |
+| ------------------------- | ------------------------------------------------------------------- |
 | Optional Rabbit republish | DLQ replay / event replay paths via `shared/events.RabbitPublisher` |
 
 | Consumed | Notes |
-|----------|-------|
-| None | |
+| -------- | ----- |
+| None     |       |
 
 ## Change events
 

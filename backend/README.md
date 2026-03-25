@@ -43,7 +43,7 @@ Multi-service **Expense Tracker / Money Manager** backend: independent deployabl
    - `go run ./services/transaction-service/cmd/api`
    - `go run ./services/budget-service/cmd/api`
 
-5. **Docker:** `docker compose -f infra/docker-compose.yml up legacy-api postgres redis` — Postgres + legacy API on port **8090** (see compose file).
+5. **Docker:** `docker compose -f infra/docker-compose.yml up legacy-api redis` — legacy API on port **8090** (Postgres depends on `DATABASE_URL`; start the `postgres` service separately if you want containerized Postgres).
 
 6. **Split stack + gateway:** `docker compose -f infra/docker-compose.yml --profile split up` — builds all images; gateway on **8080** (see `deploy/README.md`).
 

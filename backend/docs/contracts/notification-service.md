@@ -4,24 +4,24 @@
 
 Source: `services/notification-service/internal/delivery/http/router.go`.
 
-| Method | Path |
-|--------|------|
-| GET | `/health` |
-| GET | `/metrics` |
-| GET | `/api/v1/notifications/ping` | JWT |
+| Method | Path                         |
+| ------ | ---------------------------- | --- |
+| GET    | `/health`                    |
+| GET    | `/metrics`                   |
+| GET    | `/api/v1/notifications/ping` | JWT |
 
 OpenAPI: TBD.
 
 ## Events
 
-| Consumed | Notes |
-|----------|-------|
+| Consumed                                                                    | Notes                                                                                                   |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `notification.overspend.requested` (and envelope types on same routing key) | Rabbit consumer `internal/infrastructure/broker/rabbitmq.go`; trace context extracted from AMQP headers |
 
-| Produced | Notes |
-|----------|-------|
+| Produced         | Notes                                                     |
+| ---------------- | --------------------------------------------------------- |
 | Internal publish | `RabbitMQ.Publish` for downstream fan-out when configured |
-| Outbox | N/A as primary writer here |
+| Outbox           | N/A as primary writer here                                |
 
 ## Change events
 

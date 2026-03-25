@@ -51,7 +51,7 @@ help:
 
 ## deps: start Postgres (multi-DB init), RabbitMQ management UI :15672, Redis
 deps:
-	$(COMPOSE) up -d postgres rabbitmq redis
+	$(COMPOSE) up -d rabbitmq redis
 
 ## deps-down: stop infra containers
 deps-down:
@@ -59,11 +59,11 @@ deps-down:
 
 ## deps-logs: follow infra
 deps-logs:
-	$(COMPOSE) logs -f postgres rabbitmq redis
+	$(COMPOSE) logs -f rabbitmq redis
 
 ## compose-legacy: legacy API + DB + redis (see README)
 compose-legacy:
-	$(COMPOSE) up legacy-api postgres redis
+	$(COMPOSE) up legacy-api redis
 
 ## compose-split: all microservices + gateway (Docker build)
 compose-split:

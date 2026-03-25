@@ -4,11 +4,11 @@
 
 Source: `services/legacy-api/internal/delivery/http/router.go`.
 
-| Method | Path | Notes |
-|--------|------|------|
-| GET | `/health` | |
-| GET | `/metrics` | |
-| * | `/api/v1/*` | `410 Gone` strangler shell |
+| Method | Path        | Notes                      |
+| ------ | ----------- | -------------------------- |
+| GET    | `/health`   |                            |
+| GET    | `/metrics`  |                            |
+| \*     | `/api/v1/*` | `410 Gone` strangler shell |
 
 OpenAPI: TBD.
 

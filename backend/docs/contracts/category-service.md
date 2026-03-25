@@ -4,11 +4,11 @@
 
 Source: `services/category-service/cmd/server/main.go` (inline chi).
 
-| Method | Path |
-|--------|------|
-| GET | `/health` |
-| GET | `/metrics` |
-| GET | `/api/v1/meta` | Stub metadata |
+| Method | Path           |
+| ------ | -------------- | ------------- |
+| GET    | `/health`      |
+| GET    | `/metrics`     |
+| GET    | `/api/v1/meta` | Stub metadata |
 
 OpenAPI: TBD.
 

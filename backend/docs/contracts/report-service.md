@@ -4,19 +4,19 @@
 
 Source: `services/report-service/internal/delivery/http/router.go`.
 
-| Method | Path |
-|--------|------|
-| GET | `/health` |
-| GET | `/metrics` |
-| GET | `/api/v1/reports/monthly` | Query: year, month, currency |
+| Method | Path                      |
+| ------ | ------------------------- | ---------------------------- |
+| GET    | `/health`                 |
+| GET    | `/metrics`                |
+| GET    | `/api/v1/reports/monthly` | Query: year, month, currency |
 
 OpenAPI: TBD.
 
 ## Events
 
 | Produced | Consumed |
-|----------|----------|
-| None | None |
+| -------- | -------- |
+| None     | None     |
 
 ## Change events
 

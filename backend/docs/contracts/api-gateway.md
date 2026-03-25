@@ -4,13 +4,13 @@
 
 Source: `services/api-gateway/cmd/server/main.go` (`net/http.ServeMux`).
 
-| Method | Path | Notes |
-|--------|------|------|
-| GET | `/health` | |
-| GET | `/metrics` | |
-| GET | `/api/v1/gateway/routes` | Route listing |
-| GET | `/api/v1/reports`, `/api/v1/reports/*` | Proxied to report-service |
-| * | `/api/v1/*` | Prefix routing to microservices or `LEGACY_API_URL` fallback |
+| Method | Path                                   | Notes                                                        |
+| ------ | -------------------------------------- | ------------------------------------------------------------ |
+| GET    | `/health`                              |                                                              |
+| GET    | `/metrics`                             |                                                              |
+| GET    | `/api/v1/gateway/routes`               | Route listing                                                |
+| GET    | `/api/v1/reports`, `/api/v1/reports/*` | Proxied to report-service                                    |
+| \*     | `/api/v1/*`                            | Prefix routing to microservices or `LEGACY_API_URL` fallback |
 
 OpenAPI: TBD.
 

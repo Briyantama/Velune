@@ -4,23 +4,23 @@
 
 Composition: outer router in `services/auth-service/cmd/api/main.go` + `internal/delivery/http/router.go`.
 
-| Method | Path | Notes |
-|--------|------|--------|
-| GET | `/health` | Outer router |
-| GET | `/metrics` | Prometheus |
-| POST | `/api/v1/auth/register` | |
-| POST | `/api/v1/auth/login` | |
-| POST | `/api/v1/auth/refresh` | |
-| GET | `/api/v1/auth/me` | JWT |
+| Method | Path                    | Notes        |
+| ------ | ----------------------- | ------------ |
+| GET    | `/health`               | Outer router |
+| GET    | `/metrics`              | Prometheus   |
+| POST   | `/api/v1/auth/register` |              |
+| POST   | `/api/v1/auth/login`    |              |
+| POST   | `/api/v1/auth/refresh`  |              |
+| GET    | `/api/v1/auth/me`       | JWT          |
 
 OpenAPI: not centralized (TBD).
 
 ## Events
 
-| Role | Details |
-|------|---------|
+| Role     | Details                         |
+| -------- | ------------------------------- |
 | Produced | None via outbox in this service |
-| Consumed | None |
+| Consumed | None                            |
 
 ## Change events
 

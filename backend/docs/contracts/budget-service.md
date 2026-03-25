@@ -4,28 +4,28 @@
 
 Source: `services/budget-service/internal/delivery/http/router.go`.
 
-| Method | Path |
-|--------|------|
-| GET | `/health` |
-| GET | `/metrics` |
-| POST | `/internal/admin/reconcile/budget` |
-| * | `/api/v1/budgets`, `/api/v1/budgets/{id}/usage` | JWT; verbs in `router.go` |
+| Method | Path                                            |
+| ------ | ----------------------------------------------- | ------------------------- |
+| GET    | `/health`                                       |
+| GET    | `/metrics`                                      |
+| POST   | `/internal/admin/reconcile/budget`              |
+| \*     | `/api/v1/budgets`, `/api/v1/budgets/{id}/usage` | JWT; verbs in `router.go` |
 
 OpenAPI: TBD.
 
 ## Events
 
-| Produced | Notes |
-|----------|-------|
+| Produced                           | Notes                                                          |
+| ---------------------------------- | -------------------------------------------------------------- |
 | `notification.overspend.requested` | Emitted when overspend evaluated (`budget_repo.go` / use case) |
-| `budget.usage.evaluated` | Where implemented |
-| `budget.mismatch.detected` | Reconciliation (`internal/reconciliation/summary.go`) |
+| `budget.usage.evaluated`           | Where implemented                                              |
+| `budget.mismatch.detected`         | Reconciliation (`internal/reconciliation/summary.go`)          |
 
 Published via transactional outbox + dispatcher in `cmd/api`; Rabbit envelope in `shared/contracts`.
 
 | Consumed | Notes |
-|----------|-------|
-| None | |
+| -------- | ----- |
+| None     |       |
 
 ## Change events
 
