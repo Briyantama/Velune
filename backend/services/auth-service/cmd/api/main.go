@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -16,14 +18,20 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	httpapi "github.com/moon-eye/velune/services/auth-service/internal/delivery/http"
+	email "github.com/moon-eye/velune/services/auth-service/internal/infrastructure/email"
 	postgres "github.com/moon-eye/velune/services/auth-service/internal/infrastructure/postgres"
 	"github.com/moon-eye/velune/services/auth-service/internal/usecase"
 	sharedconfig "github.com/moon-eye/velune/shared/config"
+	"github.com/moon-eye/velune/shared/contracts"
+	"github.com/moon-eye/velune/shared/events"
 	"github.com/moon-eye/velune/shared/helper"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
 	"github.com/moon-eye/velune/shared/metrics"
 	"github.com/moon-eye/velune/shared/middlewares"
 	"github.com/moon-eye/velune/shared/otelx"
+	"github.com/moon-eye/velune/shared/sim"
+	stringx "github.com/moon-eye/velune/shared/stringx"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
 
@@ -70,11 +78,171 @@ func main() {
 	userRepo := postgres.NewUserRepo(store)
 	refreshRepo := postgres.NewRefreshTokenRepo(store)
 
+	otpRepo := postgres.NewOTPVerificationRepo(store)
+	provisioningRepo := postgres.NewProvisioningStateRepo(store)
+
+	otpValiditySec := 300
+	if v := os.Getenv("OTP_VALIDITY_SECONDS"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i > 0 {
+			otpValiditySec = i
+		}
+	}
+	otpResendCooldownSec := 30
+	if v := os.Getenv("OTP_RESEND_COOLDOWN_SECONDS"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i >= 0 {
+			otpResendCooldownSec = i
+		}
+	}
+	otpMaxResends := 3
+	if v := os.Getenv("OTP_MAX_RESENDS"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i >= 0 {
+			otpMaxResends = i
+		}
+	}
+	otpMaxVerifyAttempts := 3
+	if v := os.Getenv("OTP_MAX_VERIFY_ATTEMPTS"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i >= 1 {
+			otpMaxVerifyAttempts = i
+		}
+	}
+
+	// Email delivery: use SMTP if configured; otherwise fall back to a stub in dev.
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+	smtpUser := os.Getenv("SMTP_USERNAME")
+	smtpPass := os.Getenv("SMTP_PASSWORD")
+	smtpFrom := os.Getenv("SMTP_FROM")
+	if smtpFrom == "" {
+		smtpFrom = cfg.EmailFrom
+	}
+	smtpTLS := stringx.StringsEqualTrue(os.Getenv("SMTP_TLS"))
+
+	var otpSender usecase.OTPSender
+	if smtpHost == "" || smtpPort == "" || smtpFrom == "" {
+		if cfg.Environment == "production" {
+			log.Fatal("smtp not configured: set SMTP_HOST/SMTP_PORT/SMTP_FROM")
+		}
+		otpSender = &email.StubOtpSender{Log: log, From: smtpFrom}
+	} else {
+		otpSender = email.NewSMTPOtpSender(smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom, smtpTLS, log)
+	}
+
+	// RabbitMQ publishing + provisioning completion consumer.
+	var publisherPtr *events.RabbitPublisher
+	chaosCfg := sim.LoadFromEnv()
+	pub, err := events.NewRabbitPublisher(
+		cfg.BrokerURL,
+		cfg.BrokerExchange,
+		cfg.BrokerRoutingKey,
+		cfg.BrokerDLX,
+		cfg.BrokerDLQRoutingKey,
+		chaosCfg,
+	)
+	if err != nil {
+		log.Error("rabbit_publisher_init_failed", zap.Error(err))
+	} else {
+		publisherPtr = pub
+		defer func() { _ = publisherPtr.Close() }()
+
+		log.Info("rabbit_publisher_ready", zap.String("exchange", cfg.BrokerExchange))
+	}
+
+	queueName := os.Getenv("AUTH_PROVISION_COMPLETED_QUEUE")
+	if queueName == "" {
+		queueName = "auth.provision_completed"
+	}
+	completionRoutingKey := contracts.EventUserFirstLoginProvisionCompleted
+	exchange := cfg.BrokerExchange
+	dlx := cfg.BrokerDLX
+	dlqRoutingKey := cfg.BrokerDLQRoutingKey
+
+	// Completion consumer only updates auth-service provisioning state (idempotent upsert).
+	go func() {
+		if cfg.BrokerURL == "" || exchange == "" {
+			return
+		}
+		conn, err := amqp.Dial(cfg.BrokerURL)
+		if err != nil {
+			log.Error("rabbit_consumer_dial_failed", zap.Error(err))
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		ch, err := conn.Channel()
+		if err != nil {
+			log.Error("rabbit_consumer_channel_failed", zap.Error(err))
+			return
+		}
+		defer func() { _ = ch.Close() }()
+
+		if err := ch.ExchangeDeclare(exchange, "topic", true, false, false, false, nil); err != nil {
+			log.Error("rabbit_consumer_exchange_declare_failed", zap.Error(err))
+			return
+		}
+
+		args := amqp.Table{}
+		if dlx != "" {
+			args["x-dead-letter-exchange"] = dlx
+			if dlqRoutingKey != "" {
+				args["x-dead-letter-routing-key"] = dlqRoutingKey
+			}
+		}
+		q, err := ch.QueueDeclare(queueName, true, false, false, false, args)
+		if err != nil {
+			log.Error("rabbit_consumer_queue_declare_failed", zap.Error(err))
+			return
+		}
+		if err := ch.QueueBind(q.Name, completionRoutingKey, exchange, false, nil); err != nil {
+			log.Error("rabbit_consumer_queue_bind_failed", zap.Error(err))
+			return
+		}
+
+		msgs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
+		if err != nil {
+			log.Error("rabbit_consumer_consume_failed", zap.Error(err))
+			return
+		}
+
+		log.Info("rabbit_completion_consumer_started", zap.String("queue", q.Name), zap.String("routingKey", completionRoutingKey))
+		for msg := range msgs {
+			var env contracts.EventEnvelope
+			if err := json.Unmarshal(msg.Body, &env); err != nil {
+				_ = msg.Nack(false, true)
+				continue
+			}
+			if env.EventType != contracts.EventUserFirstLoginProvisionCompleted {
+				_ = msg.Ack(false)
+				continue
+			}
+
+			var payload contracts.UserFirstLoginProvisionCompleted
+			if err := json.Unmarshal(env.Payload, &payload); err != nil {
+				_ = msg.Nack(false, true)
+				continue
+			}
+
+			if err := provisioningRepo.MarkAccountProvisionedAt(context.Background(), payload.UserID, payload.OccurredAt); err != nil {
+				log.Error("provisioning_state_mark_failed", zap.Error(err), zap.String("user_id", payload.UserID.String()))
+				_ = msg.Nack(false, true)
+				continue
+			}
+			_ = msg.Ack(false)
+		}
+	}()
+
 	authSvc := &usecase.AuthService{
-		Users:         userRepo,
-		RefreshTokens: refreshRepo,
-		JWTSecret:     cfg.JWTSecret,
-		AccessTTL:     cfg.JWTExpiry,
+		Log:                  log,
+		Users:                userRepo,
+		RefreshTokens:        refreshRepo,
+		OTPVerifications:     otpRepo,
+		ProvisioningState:    provisioningRepo,
+		OTPSender:            otpSender,
+		JWTSecret:            cfg.JWTSecret,
+		AccessTTL:            cfg.JWTExpiry,
+		OTPValidity:          time.Duration(otpValiditySec) * time.Second,
+		OTPResendCooldown:    time.Duration(otpResendCooldownSec) * time.Second,
+		OTPMaxResends:        otpMaxResends,
+		OTPMaxVerifyAttempts: otpMaxVerifyAttempts,
+		EventPublisher:       publisherPtr,
 		// Refresh token TTL is configurable via REFRESH_TOKEN_TTL (see usecase).
 	}
 

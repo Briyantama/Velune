@@ -12,18 +12,21 @@ import (
 )
 
 const createUser = `-- name: CreateUser :exec
-INSERT INTO users (id, email, password_hash, base_currency, version, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO users (id, email, password_hash, base_currency, status, email_verified_at, display_name, version, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 `
 
 type CreateUserParams struct {
-	ID           pgtype.UUID
-	Email        string
-	PasswordHash string
-	BaseCurrency string
-	Version      int64
-	CreatedAt    pgtype.Timestamptz
-	UpdatedAt    pgtype.Timestamptz
+	ID              pgtype.UUID
+	Email           string
+	PasswordHash    string
+	BaseCurrency    string
+	Status          string
+	EmailVerifiedAt pgtype.Timestamptz
+	DisplayName     *string
+	Version         int64
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
@@ -32,6 +35,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 		arg.Email,
 		arg.PasswordHash,
 		arg.BaseCurrency,
+		arg.Status,
+		arg.EmailVerifiedAt,
+		arg.DisplayName,
 		arg.Version,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -40,7 +46,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, base_currency, version, created_at, updated_at, deleted_at
+SELECT id, email, password_hash, base_currency, status, email_verified_at, display_name, version, created_at, updated_at, deleted_at
 FROM users
 WHERE lower(email) = lower($1) AND deleted_at IS NULL
 `
@@ -53,6 +59,9 @@ func (q *Queries) GetUserByEmail(ctx context.Context, lower string) (User, error
 		&i.Email,
 		&i.PasswordHash,
 		&i.BaseCurrency,
+		&i.Status,
+		&i.EmailVerifiedAt,
+		&i.DisplayName,
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -62,7 +71,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, lower string) (User, error
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, base_currency, version, created_at, updated_at, deleted_at
+SELECT id, email, password_hash, base_currency, status, email_verified_at, display_name, version, created_at, updated_at, deleted_at
 FROM users
 WHERE id = $1 AND deleted_at IS NULL
 `
@@ -75,6 +84,9 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.Email,
 		&i.PasswordHash,
 		&i.BaseCurrency,
+		&i.Status,
+		&i.EmailVerifiedAt,
+		&i.DisplayName,
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,

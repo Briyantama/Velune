@@ -53,7 +53,7 @@ func TestMonthly_Success(t *testing.T) {
 	if len(out.ByCategory) != 1 || out.ByCategory[0].TotalMinor != 5000 {
 		t.Fatalf("unexpected category breakdown: %+v", out.ByCategory)
 	}
-	if out.GeneratedAt.Before(time.Now().Add(-5 * time.Second)) {
+	if out.GeneratedAt.Before(time.Now().UTC().Add(-5 * time.Second)) {
 		t.Fatalf("generatedAt too old: %v", out.GeneratedAt)
 	}
 }

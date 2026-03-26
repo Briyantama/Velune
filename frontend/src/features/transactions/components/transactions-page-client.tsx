@@ -1,9 +1,9 @@
 "use client";
 
-import * as React from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { FieldValues, Resolver, SubmitHandler, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PageHeader } from "@/src/components/common/page-header";
 import { FilterBar } from "@/src/components/common/filter-bar";
@@ -52,18 +52,18 @@ export default function TransactionsPageClient() {
   const toast = useApiToasts();
   const sp = useSearchParams();
 
-  const [page, setPage] = React.useState(1);
-  const [limit] = React.useState(20);
-  const [search, setSearch] = React.useState("");
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [search, setSearch] = useState("");
 
-  const [type, setType] = React.useState<TransactionType | "">("");
-  const [currency, setCurrency] = React.useState("USD");
-  const [from, setFrom] = React.useState("");
-  const [to, setTo] = React.useState("");
-  const [accountId, setAccountId] = React.useState("");
-  const [categoryId, setCategoryId] = React.useState("");
+  const [type, setType] = useState<TransactionType | "">("");
+  const [currency, setCurrency] = useState("IDR");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Initialize from URL query (used by budget->transactions deep links).
     const qCurrency = sp.get("currency");
     const qFrom = sp.get("from");
@@ -89,7 +89,7 @@ export default function TransactionsPageClient() {
     categoryId: categoryId || undefined,
   });
 
-  const items = React.useMemo(() => {
+  const items = useMemo(() => {
     const rows = listQ.data?.items ?? [];
     const q = search.trim().toLowerCase();
     if (!q) return rows;
@@ -100,16 +100,20 @@ export default function TransactionsPageClient() {
   const updateM = useUpdateTransaction();
   const deleteM = useDeleteTransaction();
 
-  const [edit, setEdit] = React.useState<Transaction | null>(null);
+  const [edit, setEdit] = useState<Transaction | null>(null);
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(transactionCreateSchema),
+    resolver: zodResolver(transactionCreateSchema) as Resolver<
+      FormValues,
+      any,
+      FormValues
+    >,
     defaultValues: {
       accountId: "",
       categoryId: null,
       counterpartyAccountId: null,
       amountMinor: 0,
-      currency: "USD",
+      currency: "IDR",
       type: "expense",
       description: "",
       occurredAt: new Date().toISOString(),
@@ -123,7 +127,7 @@ export default function TransactionsPageClient() {
       categoryId: null,
       counterpartyAccountId: null,
       amountMinor: 0,
-      currency,
+      currency: "IDR",
       type: "expense",
       description: "",
       occurredAt: new Date().toISOString(),
@@ -245,7 +249,12 @@ export default function TransactionsPageClient() {
                 </DialogDescription>
               </DialogHeader>
 
-              <form className="grid gap-4" onSubmit={form.handleSubmit(submit)}>
+              <form
+                className="grid gap-4"
+                onSubmit={form.handleSubmit(
+                  submit as SubmitHandler<FieldValues>,
+                )}
+              >
                 <div className="grid gap-2">
                   <Label htmlFor="accountId">Account ID</Label>
                   <Input
@@ -275,7 +284,7 @@ export default function TransactionsPageClient() {
                     <Input
                       id="currency"
                       {...form.register("currency")}
-                      placeholder="USD"
+                      placeholder="IDR"
                     />
                   </div>
                 </div>
@@ -371,7 +380,7 @@ export default function TransactionsPageClient() {
           <Input
             value={currency}
             onChange={(e) => setCurrency(e.target.value)}
-            placeholder="USD"
+            placeholder="IDR"
           />
         </div>
         <div className="grid gap-2">

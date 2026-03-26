@@ -1,28 +1,103 @@
 import { camelizeKeysDeep } from "@/src/lib/api/normalize";
 import { SafeJson } from "@/src/lib/utils";
+import {
+  getConsentModeClient,
+  getStoredTokensForMode,
+  saveLocalTokens,
+  setSessionExpiresAtCookie,
+} from "@/src/services/authStorage";
 
 type ClientError = { code: string; message: string; status: number };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const storageMode = getConsentModeClient() ?? "cookie";
+  const isLocal = storageMode === "localStorage";
+  const { accessToken, refreshToken } = isLocal ? getStoredTokensForMode("localStorage") : { accessToken: null, refreshToken: null };
+
+  const baseHeaders: Record<string, string> = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+
+  if (isLocal && accessToken) baseHeaders.Authorization = `Bearer ${accessToken}`;
+
   const resp = await fetch(`/api/admin/${stripLeadingSlash(path)}`, {
     cache: "no-store",
     ...init,
     headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {})
+      ...baseHeaders,
     }
   });
   const text = await resp.text();
   const json = text ? SafeJson(text) : undefined;
-  if (!resp.ok) {
+
+  const parseAndThrow = () => {
     const err: ClientError = {
       code: (json as any)?.code ?? "HTTP_ERROR",
       message: (json as any)?.message ?? `Request failed (${resp.status})`,
       status: resp.status
     };
     throw err;
+  };
+
+  if (!resp.ok && resp.status === 401) {
+    try {
+      const refreshResp =
+        isLocal
+          ? await fetch("/api/auth/refresh", {
+              method: "POST",
+              headers: {
+                Accept: "application/json",
+                "x-velune-refresh-token": refreshToken ?? "",
+              },
+            })
+          : await fetch("/api/auth/refresh", { method: "POST" });
+
+      if (!refreshResp.ok) throw new Error("refresh failed");
+
+      if (isLocal) {
+        const tokens = (await refreshResp.json()) as {
+          access_token: string;
+          refresh_token: string;
+          expires_in: number;
+        };
+        saveLocalTokens(tokens);
+        setSessionExpiresAtCookie(tokens.expires_in);
+      }
+
+      const retryTokens = isLocal ? getStoredTokensForMode("localStorage") : { accessToken: null };
+      const retryHeaders: Record<string, string> = {
+        ...baseHeaders,
+      };
+      if (isLocal && retryTokens.accessToken) retryHeaders.Authorization = `Bearer ${retryTokens.accessToken}`;
+      if (!isLocal) delete retryHeaders.Authorization;
+
+      const retryResp = await fetch(`/api/admin/${stripLeadingSlash(path)}`, {
+        cache: "no-store",
+        ...init,
+        headers: retryHeaders,
+      });
+
+      const retryText = await retryResp.text();
+      const retryJson = retryText ? SafeJson(retryText) : undefined;
+
+      if (!retryResp.ok) {
+        const err: ClientError = {
+          code: (retryJson as any)?.code ?? "HTTP_ERROR",
+          message: (retryJson as any)?.message ?? `Request failed (${retryResp.status})`,
+          status: retryResp.status,
+        };
+        throw err;
+      }
+
+      return camelizeKeysDeep<T>(retryJson);
+    } catch {
+      parseAndThrow();
+    }
   }
+
+  if (!resp.ok) parseAndThrow();
   return camelizeKeysDeep<T>(json);
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/src/components/common/page-header";
 import { LoadingSkeleton } from "@/src/components/common/loading-skeleton";
@@ -19,8 +19,8 @@ type DlqRow = { id: string; msg: DlqMsg };
 export default function AdminDLQClient() {
   const toast = useApiToasts();
   const qc = useQueryClient();
-  const [limit, setLimit] = React.useState(50);
-  const [eventId, setEventId] = React.useState("");
+  const [limit, setLimit] = useState(50);
+  const [eventId, setEventId] = useState("");
 
   const q = useQuery({
     queryKey: queryKeys.adminDlq({ limit }),

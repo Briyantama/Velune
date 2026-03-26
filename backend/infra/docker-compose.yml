@@ -2,18 +2,6 @@
 # Strangler: set LEGACY_API_URL on api-gateway to the legacy-api container until microservices own full API surface.
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
-
   redis:
     image: redis:7-alpine
     ports:
@@ -21,9 +9,19 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
+    environment:
+      # Avoid RabbitMQ default `guest` restriction (typically localhost-only).
+      RABBITMQ_DEFAULT_USER: velune
+      RABBITMQ_DEFAULT_PASS: velune
     ports:
       - "5672:5672"
       - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
   legacy-api:
     build:
@@ -40,12 +38,29 @@ services:
       dockerfile: services/auth-service/Dockerfile
     environment:
       HTTP_PORT: "8081"
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_auth?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@host.docker.internal:5432/velune_auth?sslmode=disable
       JWT_SECRET: dev-only-change-me
       MIGRATIONS_PATH: file:///app/migrations
       LOG_FORMAT: dev
-    depends_on:
-      - postgres
+      # RabbitMQ integration (used for provisioning events)
+      BROKER_URL: amqp://velune:velune@rabbitmq:5672/
+      BROKER_EXCHANGE: velune.events
+      BROKER_ROUTING_KEY: notification.overspend.requested
+      BROKER_DLX: velune.events.dlx
+      BROKER_DLQ: velune.events.dlq
+      BROKER_DLQ_ROUTING_KEY: velune.dlq
+      # auth-service email OTP settings
+      OTP_VALIDITY_SECONDS: "300"
+      OTP_RESEND_COOLDOWN_SECONDS: "30"
+      OTP_MAX_RESENDS: "3"
+      OTP_MAX_VERIFY_ATTEMPTS: "3"
+      # Leave SMTP_HOST/SMTP_PORT empty to use the non-delivering dev stub.
+      SMTP_HOST: ""
+      SMTP_PORT: ""
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
+      SMTP_TLS: "false"
+      AUTH_PROVISION_COMPLETED_QUEUE: auth.provision_completed
     ports:
       - "8081:8081"
     profiles: ["split"]
@@ -56,11 +71,11 @@ services:
       dockerfile: services/transaction-service/Dockerfile
     environment:
       HTTP_PORT: "8082"
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_transaction?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@host.docker.internal:5432/velune_transaction?sslmode=disable
       JWT_SECRET: dev-only-change-me
       MIGRATIONS_PATH: file:///app/migrations
       LOG_FORMAT: dev
-      BROKER_URL: amqp://guest:guest@rabbitmq:5672/
+      BROKER_URL: amqp://velune:velune@rabbitmq:5672/
       BROKER_EXCHANGE: velune.events
       BROKER_ROUTING_KEY: notification.overspend.requested
       BROKER_DLX: velune.events.dlx
@@ -71,8 +86,8 @@ services:
       RETRY_BASE_DELAY_SECONDS: "2"
       ADMIN_INTERNAL_KEY: ${ADMIN_INTERNAL_KEY:-dev-admin-internal-key}
     depends_on:
-      - postgres
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
     ports:
       - "8082:8082"
     profiles: ["split"]
@@ -94,12 +109,12 @@ services:
       dockerfile: services/budget-service/Dockerfile
     environment:
       HTTP_PORT: "8084"
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_budget?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@host.docker.internal:5432/velune_budget?sslmode=disable
       JWT_SECRET: dev-only-change-me
       MIGRATIONS_PATH: file:///app/migrations
       TRANSACTION_SERVICE_URL: http://transaction-service:8082
       LOG_FORMAT: dev
-      BROKER_URL: amqp://guest:guest@rabbitmq:5672/
+      BROKER_URL: amqp://velune:velune@rabbitmq:5672/
       BROKER_EXCHANGE: velune.events
       BROKER_ROUTING_KEY: notification.overspend.requested
       BROKER_DLX: velune.events.dlx
@@ -109,9 +124,10 @@ services:
       OUTBOX_MAX_RETRY: "7"
       RETRY_BASE_DELAY_SECONDS: "2"
     depends_on:
-      - postgres
-      - transaction-service
-      - rabbitmq
+      transaction-service:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
     ports:
       - "8084:8084"
     profiles: ["split"]
@@ -137,10 +153,10 @@ services:
       dockerfile: services/notification-service/Dockerfile
     environment:
       HTTP_PORT: "8086"
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_notification?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@host.docker.internal:5432/velune_notification?sslmode=disable
       MIGRATIONS_PATH: file:///app/migrations
       JWT_SECRET: dev-only-change-me
-      BROKER_URL: amqp://guest:guest@rabbitmq:5672/
+      BROKER_URL: amqp://velune:velune@rabbitmq:5672/
       BROKER_EXCHANGE: velune.events
       BROKER_QUEUE: notification.overspend
       BROKER_ROUTING_KEY: notification.overspend.requested
@@ -153,8 +169,8 @@ services:
       EMAIL_FROM: noreply@velune.local
       LOG_FORMAT: dev
     depends_on:
-      - rabbitmq
-      - postgres
+      rabbitmq:
+        condition: service_healthy
     ports:
       - "8086:8086"
     profiles: ["split"]
@@ -168,10 +184,10 @@ services:
       HTTP_PORT: "8099"
       ADMIN_API_KEY: ${ADMIN_API_KEY:-dev-admin-api-key}
       ADMIN_INTERNAL_KEY: ${ADMIN_INTERNAL_KEY:-dev-admin-internal-key}
-      TRANSACTION_DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_transaction?sslmode=disable
-      BUDGET_DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_budget?sslmode=disable
-      NOTIFICATION_DATABASE_URL: postgres://postgres:postgres@postgres:5432/velune_notification?sslmode=disable
-      BROKER_URL: amqp://guest:guest@rabbitmq:5672/
+      TRANSACTION_DATABASE_URL: postgres://postgres:postgres@host.docker.internal:5432/velune_transaction?sslmode=disable
+      BUDGET_DATABASE_URL: postgres://postgres:postgres@host.docker.internal:5432/velune_budget?sslmode=disable
+      NOTIFICATION_DATABASE_URL: postgres://postgres:postgres@host.docker.internal:5432/velune_notification?sslmode=disable
+      BROKER_URL: amqp://velune:velune@rabbitmq:5672/
       BROKER_EXCHANGE: velune.events
       BROKER_ROUTING_KEY: notification.overspend.requested
       BROKER_DLX: velune.events.dlx
@@ -185,11 +201,14 @@ services:
       NOTIFICATION_SERVICE_URL: http://notification-service:8086
       LOG_FORMAT: dev
     depends_on:
-      - postgres
-      - rabbitmq
-      - transaction-service
-      - budget-service
-      - notification-service
+      rabbitmq:
+        condition: service_healthy
+      transaction-service:
+        condition: service_started
+      budget-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
     ports:
       - "127.0.0.1:8099:8099"
     profiles: ["split"]
@@ -213,6 +232,3 @@ services:
     depends_on:
       - legacy-api
     profiles: ["split"]
-
-volumes:
-  pgdata:

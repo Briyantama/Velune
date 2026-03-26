@@ -20,7 +20,7 @@ export function formatMoneyMinor(input: { amountMinor: number; currency: string;
 
 export function currencyMeta(currency: string): { fractionDigits: number } {
   // Conservative default for most ISO currencies.
-  const cur = (currency || "USD").toUpperCase();
+  const cur = (currency || "IDR").toUpperCase();
   if (cur === "JPY" || cur === "KRW") return { fractionDigits: 0 };
   return { fractionDigits: 2 };
 }

@@ -10,11 +10,19 @@ import { Button } from "@/src/components/ui/button";
 import { Card, CardContent } from "@/src/components/ui/card";
 import { queryKeys } from "@/src/lib/query/keys";
 import { useApiToasts } from "@/src/lib/api/toast";
-import { authClient } from "@/src/features/auth/services/authClient";
+import { authClient, Me } from "@/src/features/auth/services/authClient";
+import { useAppDispatch } from "@/src/store/hooks";
+import { clearAuthState } from "@/src/store/slices/authSlice";
+import { clearMe } from "@/src/store/slices/userSessionSlice";
+import { useAppSelector } from "@/src/store/hooks";
+import { setConsent, type StorageMode } from "@/src/store/slices/consentSlice";
+import { clearAllLocalSessionArtifacts, setConsentModeCookie } from "@/src/services/authStorage";
 
 export default function SettingsPageClient() {
   const toast = useApiToasts();
-  const meQ = useQuery({
+  const dispatch = useAppDispatch();
+  const storageMode = useAppSelector((s) => s.consent.storageMode);
+  const meQ = useQuery<Me>({
     queryKey: queryKeys.me(),
     queryFn: () => authClient.me(),
   });
@@ -61,9 +69,9 @@ export default function SettingsPageClient() {
           <CardContent className="p-6">
             <div className="text-base font-semibold">Profile</div>
             <dl className="mt-4 grid grid-cols-1 gap-3 text-sm">
-              <KV k="Email" v={meQ.data?.email ?? "unknown"} />
-              <KV k="Base currency" v={meQ.data?.baseCurrency ?? "USD"} />
-              <KV k="User ID" v={meQ.data?.userId ?? "unknown"} />
+              <KV k="Email" v={meQ.data?.email ?? "N/A"} />
+              <KV k="Base currency" v={meQ.data?.baseCurrency ?? "IDR"} />
+              <KV k="User ID" v={meQ.data?.userId ?? "N/A"} />
             </dl>
           </CardContent>
         </Card>
@@ -119,6 +127,8 @@ export default function SettingsPageClient() {
                 onConfirm={async () => {
                   try {
                     await authClient.logout();
+                    dispatch(clearAuthState());
+                    dispatch(clearMe());
                     toast.showSuccess("Logged out");
                     window.location.href = "/login";
                   } catch (e) {
@@ -128,6 +138,67 @@ export default function SettingsPageClient() {
               >
                 <Button variant="destructive">Log out</Button>
               </ConfirmDialog>
+            </div>
+
+            <div className="mt-6 rounded-2xl border bg-card p-4">
+              <div className="text-sm font-semibold">Storage mode</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {storageMode === "localStorage"
+                  ? "Auth is stored in your browser (local storage) instead of cookies."
+                  : "Auth is stored in secure cookies (recommended)."}
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <ConfirmDialog
+                  title="Use cookies?"
+                  description="Switch auth storage to cookies and sign in again."
+                  confirmLabel="Use cookies"
+                  variant="default"
+                  onConfirm={async () => {
+                    try {
+                      await authClient.logout();
+                      clearAllLocalSessionArtifacts();
+                      setConsentModeCookie("cookie");
+                      dispatch(setConsent({ storageMode: "cookie" }));
+                      dispatch(clearAuthState());
+                      dispatch(clearMe());
+                      toast.showSuccess("Storage updated");
+                      window.location.href = "/login";
+                    } catch (e) {
+                      toast.showError(e, "Update failed");
+                    }
+                  }}
+                >
+                  <Button variant={storageMode === "cookie" ? "default" : "outline"}>
+                    Use cookies
+                  </Button>
+                </ConfirmDialog>
+
+                <ConfirmDialog
+                  title="Use local storage?"
+                  description="Switch auth storage to local storage and sign in again."
+                  confirmLabel="Use local storage"
+                  variant="default"
+                  onConfirm={async () => {
+                    try {
+                      await authClient.logout();
+                      clearAllLocalSessionArtifacts();
+                      setConsentModeCookie("localStorage");
+                      dispatch(setConsent({ storageMode: "localStorage" }));
+                      dispatch(clearAuthState());
+                      dispatch(clearMe());
+                      toast.showSuccess("Storage updated");
+                      window.location.href = "/login";
+                    } catch (e) {
+                      toast.showError(e, "Update failed");
+                    }
+                  }}
+                >
+                  <Button variant={storageMode === "localStorage" ? "default" : "outline"}>
+                    Use local storage
+                  </Button>
+                </ConfirmDialog>
+              </div>
             </div>
           </CardContent>
         </Card>

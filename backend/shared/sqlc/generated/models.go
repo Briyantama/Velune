@@ -116,6 +116,31 @@ type NotificationJob struct {
 	UpdatedAt   pgtype.Timestamptz
 }
 
+type OtpVerification struct {
+	ID                 pgtype.UUID
+	UserID             pgtype.UUID
+	Email              string
+	OtpHash            string
+	ExpiresAt          pgtype.Timestamptz
+	ConsumedAt         pgtype.Timestamptz
+	ResendCount        int32
+	VerifyAttemptCount int32
+	Version            int64
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+	DeletedAt          pgtype.Timestamptz
+}
+
+type ProvisioningState struct {
+	ID                   pgtype.UUID
+	UserID               pgtype.UUID
+	AccountProvisionedAt pgtype.Timestamptz
+	Version              int64
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+	DeletedAt            pgtype.Timestamptz
+}
+
 type RecurringRule struct {
 	ID          pgtype.UUID
 	UserID      pgtype.UUID
@@ -165,12 +190,15 @@ type Transaction struct {
 }
 
 type User struct {
-	ID           pgtype.UUID
-	Email        string
-	PasswordHash string
-	BaseCurrency string
-	Version      int64
-	CreatedAt    pgtype.Timestamptz
-	UpdatedAt    pgtype.Timestamptz
-	DeletedAt    pgtype.Timestamptz
+	ID              pgtype.UUID
+	Email           string
+	PasswordHash    string
+	BaseCurrency    string
+	Status          string
+	EmailVerifiedAt pgtype.Timestamptz
+	DisplayName     *string
+	Version         int64
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+	DeletedAt       pgtype.Timestamptz
 }

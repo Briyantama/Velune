@@ -6,11 +6,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/src/components/ui/toaster";
 import { isClientError } from "@/src/lib/api/errors";
+import { useAppDispatch } from "@/src/store/hooks";
+import { clearAuthState } from "@/src/store/slices/authSlice";
+import { clearMe } from "@/src/store/slices/userSessionSlice";
+import { clearAllLocalSessionArtifacts } from "@/src/services/authStorage";
 
 export function QueryProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const toast = useToast();
+  const dispatch = useAppDispatch();
 
   const clientRef = useRef<QueryClient | null>(null);
   const handled401Ref = useRef(false);
@@ -31,6 +36,11 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
 
     handled401Ref.current = true;
     clientRef.current?.clear();
+
+    dispatch(clearAuthState());
+    dispatch(clearMe());
+    // Clear localStorage artifacts too (no-ops in cookie mode).
+    clearAllLocalSessionArtifacts();
 
     // Clear httpOnly auth cookies server-side, then return user to login.
     void fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);

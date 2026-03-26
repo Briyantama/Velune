@@ -20,6 +20,8 @@ type Server struct {
 func NewRouter(s *Server) http.Handler {
 	r := chi.NewRouter()
 	r.Post("/api/v1/auth/register", s.handleRegister)
+	r.Post("/api/v1/auth/verify-otp", s.handleVerifyOTP)
+	r.Post("/api/v1/auth/resend-otp", s.handleResendOTP)
 	r.Post("/api/v1/auth/login", s.handleLogin)
 	r.Post("/api/v1/auth/refresh", s.handleRefresh)
 	r.Get("/api/v1/auth/me", s.handleMe)
@@ -27,14 +29,25 @@ func NewRouter(s *Server) http.Handler {
 }
 
 type registerReq struct {
-	Email        string `json:"email" validate:"required,email"`
-	Password     string `json:"password" validate:"required,min=8,max=72"`
-	BaseCurrency string `json:"baseCurrency" validate:"required,len=3"`
+	Email           string `json:"email" validate:"required,email"`
+	Password        string `json:"password" validate:"required,min=8,max=72"`
+	ConfirmPassword string `json:"confirmPassword" validate:"required,eqfield=Password"`
+	BaseCurrency    string `json:"baseCurrency" validate:"required,len=3"`
+	DisplayName     string `json:"displayName"`
 }
 
 type loginReq struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
+}
+
+type verifyOTPReq struct {
+	Email   string `json:"email" validate:"required,email"`
+	OTPCode string `json:"otp" validate:"required,len=6"`
+}
+
+type resendOTPReq struct {
+	Email string `json:"email" validate:"required,email"`
 }
 
 type refreshReq struct {
@@ -56,6 +69,13 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		Email:        req.Email,
 		Password:     req.Password,
 		BaseCurrency: req.BaseCurrency,
+		DisplayName: func() *string {
+			ds := stringx.TrimSpace(req.DisplayName)
+			if ds == "" {
+				return nil
+			}
+			return &ds
+		}(),
 	})
 	if err != nil {
 		httpx.WriteError(w, err)
@@ -84,6 +104,49 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteJSON(w, constx.StatusOK, resp)
+}
+
+func (s *Server) handleVerifyOTP(w http.ResponseWriter, r *http.Request) {
+	var req verifyOTPReq
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	if err := s.Validate.Struct(req); err != nil {
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", err.Error(), constx.StatusBadRequest))
+		return
+	}
+
+	if err := s.Auth.VerifyOTP(r.Context(), usecase.VerifyOTPInput{
+		Email:   req.Email,
+		OTPCode: req.OTPCode,
+	}); err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, constx.StatusOK, map[string]string{"message": "OTP verified"})
+}
+
+func (s *Server) handleResendOTP(w http.ResponseWriter, r *http.Request) {
+	var req resendOTPReq
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	if err := s.Validate.Struct(req); err != nil {
+		httpx.WriteError(w, errs.New("VALIDATION_ERROR", err.Error(), constx.StatusBadRequest))
+		return
+	}
+
+	if err := s.Auth.ResendOTP(r.Context(), usecase.ResendOTPInput{
+		Email: req.Email,
+	}); err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, constx.StatusOK, map[string]string{"message": "OTP sent"})
 }
 
 func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {

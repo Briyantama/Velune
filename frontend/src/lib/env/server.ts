@@ -1,7 +1,8 @@
 export const serverEnv = {
   gatewayBaseUrl: requiredEnv("NEXT_PUBLIC_GATEWAY_BASE_URL"),
   adminServiceUrl: optionalEnv("ADMIN_SERVICE_URL"),
-  adminApiKey: optionalEnv("ADMIN_API_KEY")
+  adminApiKey: optionalEnv("ADMIN_API_KEY"),
+  authServiceUrl: optionalEnv("NEXT_PUBLIC_AUTH_SERVICE_URL")
 };
 
 function requiredEnv(key: string): string {

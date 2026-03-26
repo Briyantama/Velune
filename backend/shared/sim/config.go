@@ -2,8 +2,8 @@ package sim
 
 import (
 	"os"
+	"strconv"
 
-	"github.com/moon-eye/velune/shared/helper"
 	"github.com/moon-eye/velune/shared/stringx"
 )
 
@@ -24,8 +24,8 @@ func LoadFromEnv() *Config {
 		BrokerDown:      stringx.StringsEqualTrue(os.Getenv("SIMULATE_BROKER_DOWN")),
 		ConsumerPanic:   stringx.StringsEqualTrue(stringx.TrimSpace(os.Getenv("SIMULATE_CONSUMER_PANIC"))),
 		DLQSnoop:        stringx.StringsEqualTrue(stringx.TrimSpace(os.Getenv("SIMULATE_DLQ_SNOOP"))),
-		PublishFailRate: helper.ToFloat64(os.Getenv("SIMULATE_PUBLISH_FAIL_RATE")),
-		EmailFailRate:   helper.ToFloat64(os.Getenv("SIMULATE_EMAIL_FAIL_RATE")),
+		PublishFailRate: parsePercentEnvFloat("SIMULATE_PUBLISH_FAIL_RATE"),
+		EmailFailRate:   parsePercentEnvFloat("SIMULATE_EMAIL_FAIL_RATE"),
 	}
 	if c.PublishFailRate < 0 {
 		c.PublishFailRate = 0
@@ -40,12 +40,7 @@ func LoadFromEnv() *Config {
 		c.EmailFailRate = 1
 	}
 
-	seed, err := helper.ToInt64(os.Getenv("SIMULATE_SEED"))
-	if err != nil {
-		c.rngSource = 0
-	} else {
-		c.rngSource = seed
-	}
+	c.rngSource = parseEnvInt64("SIMULATE_SEED")
 	src := c.rngSource
 	// Mulberry64: deterministic, fast, good enough for test injection.
 	var state uint64
@@ -64,6 +59,32 @@ func LoadFromEnv() *Config {
 		return float64(z>>11) / float64(1<<53)
 	}
 	return c
+}
+
+func parseEnvInt64(key string) int64 {
+	v := stringx.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return 0
+	}
+	i, err := strconv.ParseInt(v, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return i
+}
+
+// parsePercentEnvFloat parses a float env var and returns 0 when missing/invalid.
+// Values are expected to already be in [0,1] (e.g. 0.37).
+func parsePercentEnvFloat(key string) float64 {
+	v := stringx.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return 0
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return 0
+	}
+	return f
 }
 
 // RNGSeed returns the effective seed (after env or crypto fallback) for logging/tests.

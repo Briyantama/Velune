@@ -27,7 +27,7 @@ Multi-service **Expense Tracker / Money Manager** backend: independent deployabl
 
 ## Local development
 
-1. Install Go **1.22+**.
+1. Install Go **1.25+**.
 2. From **`backend/`** (workspace root): `go work sync` (optional).
 3. **Legacy API (full feature set today):**
 

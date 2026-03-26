@@ -12,4 +12,5 @@ type UserRepository interface {
 	Create(ctx context.Context, u *domain.User) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
+	ActivateAfterOTP(ctx context.Context, userID uuid.UUID) error
 }

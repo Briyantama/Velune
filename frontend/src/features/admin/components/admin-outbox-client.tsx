@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import { useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/src/components/common/page-header";
 import { LoadingSkeleton } from "@/src/components/common/loading-skeleton";
@@ -27,11 +27,11 @@ type Row = {
 export default function AdminOutboxClient() {
   const toast = useApiToasts();
   const qc = useQueryClient();
-  const [service, setService] = React.useState<
-    "all" | "transaction" | "budget"
-  >("all");
-  const [status, setStatus] = React.useState("");
-  const [limit, setLimit] = React.useState(50);
+  const [service, setService] = useState<"all" | "transaction" | "budget">(
+    "all",
+  );
+  const [status, setStatus] = useState("");
+  const [limit, setLimit] = useState(50);
 
   const q = useQuery({
     queryKey: queryKeys.adminOutbox({
@@ -51,7 +51,7 @@ export default function AdminOutboxClient() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["adminOutbox"] }),
   });
 
-  const rows: Row[] = React.useMemo(() => {
+  const rows: Row[] = useMemo(() => {
     const out: Row[] = [];
     const payload = q.data ?? {};
     for (const [svc, list] of Object.entries(payload)) {

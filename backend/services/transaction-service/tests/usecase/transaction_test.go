@@ -109,7 +109,7 @@ func TestTransactionService_Create_ExpenseNegativeAmount(t *testing.T) {
 		AmountMinor: -100,
 		Currency:    "USD",
 		Type:        "expense",
-		OccurredAt:  time.Now(),
+		OccurredAt:  time.Now().UTC(),
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "amount")
@@ -129,7 +129,7 @@ func TestTransactionService_Create_TransferMissingCounterparty(t *testing.T) {
 		AmountMinor: 100,
 		Currency:    "USD",
 		Type:        "transfer",
-		OccurredAt:  time.Now(),
+		OccurredAt:  time.Now().UTC(),
 	})
 	require.Error(t, err)
 }
@@ -153,7 +153,7 @@ func TestTransactionService_Update_VersionConflict(t *testing.T) {
 	s := &usecase.TransactionService{
 		Ledger: &mockLedger{},
 		Transactions: &testTxRepo{getFn: func(ctx context.Context, u uuid.UUID, id uuid.UUID) (*domain.Transaction, error) {
-			return &domain.Transaction{ID: txID, UserID: userID, Version: 2, AccountID: uuid.New(), AmountMinor: 100, Currency: "USD", Type: domain.TransactionExpense, OccurredAt: time.Now()}, nil
+			return &domain.Transaction{ID: txID, UserID: userID, Version: 2, AccountID: uuid.New(), AmountMinor: 100, Currency: "USD", Type: domain.TransactionExpense, OccurredAt: time.Now().UTC()}, nil
 		}},
 		Accounts:   &noopAccountRepo{},
 		Categories: &mockCategoryRepo{},
@@ -164,7 +164,7 @@ func TestTransactionService_Update_VersionConflict(t *testing.T) {
 		AmountMinor: 100,
 		Currency:    "USD",
 		Type:        "expense",
-		OccurredAt:  time.Now(),
+		OccurredAt:  time.Now().UTC(),
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "version conflict")
@@ -184,7 +184,7 @@ func TestTransactionService_Create_Success(t *testing.T) {
 		AmountMinor: 100,
 		Currency:    "USD",
 		Type:        "expense",
-		OccurredAt:  time.Now(),
+		OccurredAt:  time.Now().UTC(),
 	})
 	require.NoError(t, err)
 }

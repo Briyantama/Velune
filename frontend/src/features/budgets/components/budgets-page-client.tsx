@@ -1,8 +1,9 @@
 "use client";
 
-import * as React from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { Resolver, useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PageHeader } from "@/src/components/common/page-header";
 import { LoadingSkeleton } from "@/src/components/common/loading-skeleton";
@@ -49,30 +50,34 @@ type FormValues = {
 
 export default function BudgetsPageClient() {
   const toast = useApiToasts();
-  const [page, setPage] = React.useState(1);
-  const [limit] = React.useState(20);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
 
   const listQ = useBudgetsList({ page, limit });
   const createM = useCreateBudget();
   const updateM = useUpdateBudget();
   const deleteM = useDeleteBudget();
 
-  const [edit, setEdit] = React.useState<Budget | null>(null);
-  const [usageId, setUsageId] = React.useState<string | null>(null);
+  const [edit, setEdit] = useState<Budget | null>(null);
+  const [usageId, setUsageId] = useState<string | null>(null);
 
   const usageQ = useBudgetUsage(usageId ?? "");
   const showUsage = usageId ? usageQ : null;
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(budgetUpsertSchema) as Resolver<FormValues, any, FormValues>,
+    resolver: zodResolver(budgetUpsertSchema) as Resolver<
+      FormValues,
+      any,
+      FormValues
+    >,
     defaultValues: {
       name: "",
       periodType: "monthly",
       categoryId: null,
-      startDate: new Date().toISOString(),
-      endDate: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+      startDate: new Date(Date.now()).toISOString(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       limitAmountMinor: 0,
-      currency: "USD",
+      currency: "IDR",
     },
   });
 
@@ -82,10 +87,10 @@ export default function BudgetsPageClient() {
       name: "",
       periodType: "monthly",
       categoryId: null,
-      startDate: new Date().toISOString(),
-      endDate: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString(),
+      startDate: new Date(Date.now()).toISOString(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       limitAmountMinor: 0,
-      currency: "USD",
+      currency: "IDR",
     });
   };
 

@@ -12,6 +12,10 @@ import { useApiToasts } from "@/src/lib/api/toast";
 import { loginSchema } from "@/src/features/auth/schema/authSchemas";
 import { SafeJson, FieldError } from "@/src/lib/utils";
 import { z } from "zod";
+import { getConsentModeClient, saveLocalTokens, setSessionExpiresAtCookie } from "@/src/services/authStorage";
+import { useAppDispatch } from "@/src/store/hooks";
+import { setStatus } from "@/src/store/slices/authSlice";
+import type { TokenResponse } from "@/src/lib/api/backend-types";
 
 type Values = z.infer<typeof loginSchema>;
 
@@ -19,6 +23,7 @@ export default function LoginClient() {
   const toast = useApiToasts();
   const sp = useSearchParams();
   const next = sp.get("next") ?? "/dashboard";
+  const dispatch = useAppDispatch();
 
   const form = useForm<Values>({
     resolver: zodResolver(loginSchema),
@@ -37,6 +42,7 @@ export default function LoginClient() {
           className="mt-6 grid gap-4"
           onSubmit={form.handleSubmit(async (values) => {
             try {
+              const storageMode = getConsentModeClient() ?? "cookie";
               const resp = await fetch("/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -51,6 +57,14 @@ export default function LoginClient() {
                   status: resp.status,
                 };
               }
+
+              if (storageMode === "localStorage") {
+                const tokens = json as TokenResponse;
+                if (!tokens?.access_token || !tokens?.refresh_token) throw new Error("login tokens missing");
+                saveLocalTokens(tokens);
+                setSessionExpiresAtCookie(tokens.expires_in);
+              }
+              dispatch(setStatus("authenticated"));
               window.location.href = next;
             } catch (e) {
               toast.showError(e, "Login failed");

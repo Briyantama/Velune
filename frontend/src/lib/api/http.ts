@@ -2,6 +2,24 @@ import { serverEnv } from "@/src/lib/env/server";
 import type { BackendError } from "@/src/lib/api/backend-types";
 import { SafeJson } from "../utils";
 
+type RouteCtx = { params: { path: string[] } };
+
+export async function GET(req: Request, ctx: RouteCtx) {
+  return proxy(req, ctx);
+}
+export async function POST(req: Request, ctx: RouteCtx) {
+  return proxy(req, ctx);
+}
+export async function PUT(req: Request, ctx: RouteCtx) {
+  return proxy(req, ctx);
+}
+export async function PATCH(req: Request, ctx: RouteCtx) {
+  return proxy(req, ctx);
+}
+export async function DELETE(req: Request, ctx: RouteCtx) {
+  return proxy(req, ctx);
+}
+
 export class ApiError extends Error {
   code: string;
   status: number;

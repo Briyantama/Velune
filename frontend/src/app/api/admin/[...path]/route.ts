@@ -5,6 +5,7 @@ import { ApiError, ensureCorrelationId, gatewayFetch, readJsonOrThrow } from "@/
 import { ACCESS_COOKIE, REFRESH_COOKIE, cookieOptions } from "@/src/lib/auth/cookies";
 import { serverEnv } from "@/src/lib/env/server";
 import { SafeJson } from "@/src/lib/utils";
+import { getConsentModeFromJar } from "@/src/services/authStorage";
 
 export const dynamic = "force-dynamic";
 
@@ -29,60 +30,96 @@ async function proxy(req: Request, ctx: RouteCtx) {
   const cid = ensureCorrelationId(reqHeaders.get("x-correlation-id"));
 
   const jar = await cookies();
-  const access = jar.get(ACCESS_COOKIE)?.value ?? "";
-  const refresh = jar.get(REFRESH_COOKIE)?.value ?? "";
+  const storageMode = getConsentModeFromJar(jar) ?? "cookie";
 
-  if (!access || !refresh) {
-    return NextResponse.json(
-      { code: "AUTH_REQUIRED", message: "authentication required" },
-      { status: 401, headers: { "X-Correlation-ID": cid } },
-    );
-  }
+  const authorization = reqHeaders.get("authorization") ?? "";
+  const accessHeader = authorization.startsWith("Bearer ") ? authorization.slice("Bearer ".length) : "";
 
-  // Admin service uses API-key auth; enforce user session validity here so expired
-  // sessions are cleared + users are redirected.
-  try {
-    const meResp = await gatewayFetch({
-      path: "/api/v1/auth/me",
-      method: "GET",
-      accessToken: access,
-      correlationId: cid,
-      cache: "no-store",
-    });
-    await readJsonOrThrow<MeResponse>(meResp);
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 401) {
-      const refreshResp = await gatewayFetch({
-        path: "/api/v1/auth/refresh",
-        method: "POST",
-        body: { refresh_token: refresh },
+  if (storageMode === "localStorage") {
+    if (!accessHeader) {
+      return NextResponse.json(
+        { code: "AUTH_REQUIRED", message: "authentication required" },
+        { status: 401, headers: { "X-Correlation-ID": cid } },
+      );
+    }
+
+    try {
+      const meResp = await gatewayFetch({
+        path: "/api/v1/auth/me",
+        method: "GET",
+        accessToken: accessHeader,
         correlationId: cid,
         cache: "no-store",
       });
-
-      try {
-        const tokens = await readJsonOrThrow<TokenResponse>(refreshResp);
-        jar.set(ACCESS_COOKIE, tokens.access_token, {
-          ...cookieOptions(),
-          maxAge: Math.max(1, tokens.expires_in),
-        });
-        jar.set(REFRESH_COOKIE, tokens.refresh_token, {
-          ...cookieOptions(),
-          maxAge: 60 * 60 * 24 * 30,
-        });
-      } catch {
-        jar.set(ACCESS_COOKIE, "", { ...cookieOptions(), maxAge: 0 });
-        jar.set(REFRESH_COOKIE, "", { ...cookieOptions(), maxAge: 0 });
+      await readJsonOrThrow<MeResponse>(meResp);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
         return NextResponse.json(
           { code: "SESSION_EXPIRED", message: "session expired" },
           { status: 401, headers: { "X-Correlation-ID": cid } },
         );
       }
-    } else {
       return NextResponse.json(
         { code: "AUTH_VALIDATION_FAILED", message: "authentication validation failed" },
         { status: 401, headers: { "X-Correlation-ID": cid } },
       );
+    }
+  } else {
+    const access = jar.get(ACCESS_COOKIE)?.value ?? "";
+    const refresh = jar.get(REFRESH_COOKIE)?.value ?? "";
+
+    if (!access || !refresh) {
+      return NextResponse.json(
+        { code: "AUTH_REQUIRED", message: "authentication required" },
+        { status: 401, headers: { "X-Correlation-ID": cid } },
+      );
+    }
+
+    // Admin service uses API-key auth; enforce user session validity here so expired
+    // sessions are cleared + users are redirected.
+    try {
+      const meResp = await gatewayFetch({
+        path: "/api/v1/auth/me",
+        method: "GET",
+        accessToken: access,
+        correlationId: cid,
+        cache: "no-store",
+      });
+      await readJsonOrThrow<MeResponse>(meResp);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        const refreshResp = await gatewayFetch({
+          path: "/api/v1/auth/refresh",
+          method: "POST",
+          body: { refresh_token: refresh },
+          correlationId: cid,
+          cache: "no-store",
+        });
+
+        try {
+          const tokens = await readJsonOrThrow<TokenResponse>(refreshResp);
+          jar.set(ACCESS_COOKIE, tokens.access_token, {
+            ...cookieOptions(),
+            maxAge: Math.max(1, tokens.expires_in),
+          });
+          jar.set(REFRESH_COOKIE, tokens.refresh_token, {
+            ...cookieOptions(),
+            maxAge: 60 * 60 * 24 * 30,
+          });
+        } catch {
+          jar.set(ACCESS_COOKIE, "", { ...cookieOptions(), maxAge: 0 });
+          jar.set(REFRESH_COOKIE, "", { ...cookieOptions(), maxAge: 0 });
+          return NextResponse.json(
+            { code: "SESSION_EXPIRED", message: "session expired" },
+            { status: 401, headers: { "X-Correlation-ID": cid } },
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { code: "AUTH_VALIDATION_FAILED", message: "authentication validation failed" },
+          { status: 401, headers: { "X-Correlation-ID": cid } },
+        );
+      }
     }
   }
 

@@ -1,8 +1,7 @@
 "use client";
 
-import * as React from "react";
-
 import { cn } from "@/src/lib/utils";
+import { ReactNode } from "react";
 
 type AlertVariant = "success" | "warning" | "error" | "info";
 
@@ -17,7 +16,7 @@ export function AlertCard({
   title: string;
   description?: string;
   className?: string;
-  actions?: React.ReactNode;
+  actions?: ReactNode | ReactNode[];
 }) {
   const stylesByVariant: Record<AlertVariant, string> = {
     success: "border-success/30 bg-success/10 text-success-foreground",
@@ -32,15 +31,16 @@ export function AlertCard({
       className={cn(
         "rounded-2xl border p-4 shadow-soft",
         stylesByVariant[variant],
-        className
+        className,
       )}
     >
       <div className="flex flex-col gap-2">
         <div className="text-sm font-semibold">{title}</div>
-        {description ? <div className="text-sm opacity-90">{description}</div> : null}
+        {description ? (
+          <div className="text-sm opacity-90">{description}</div>
+        ) : null}
         {actions ? <div className="pt-1">{actions}</div> : null}
       </div>
     </div>
   );
 }
-

@@ -39,14 +39,14 @@ export default function TransactionDetailClient({ id }: { id: string }) {
               k="Amount"
               v={formatMoneyMinor({
                 amountMinor: t?.amountMinor ?? 0,
-                currency: t?.currency ?? "USD",
+                currency: t?.currency ?? "IDR",
               })}
             />
             <KV
               k="Occurred at"
               v={new Date(t?.occurredAt ?? "").toLocaleString()}
             />
-            <KV k="Currency" v={t?.currency ?? "USD"} />
+            <KV k="Currency" v={t?.currency ?? "IDR"} />
             <KV k="Account ID" v={t?.accountId ?? "N/A"} />
             <KV k="Category ID" v={t?.categoryId ?? "N/A"} />
             <KV

@@ -17,14 +17,14 @@ type Claims struct {
 }
 
 func Sign(userID uuid.UUID, email, secret string, ttl time.Duration) (string, error) {
-	now := time.Now()
+	now := time.Now().UTC().Unix()
 	claims := Claims{
 		UserID: userID,
 		Email:  email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID.String(),
-			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+			IssuedAt:  jwt.NewNumericDate(time.Unix(now, 0)),
+			ExpiresAt: jwt.NewNumericDate(time.Unix(now+int64(ttl.Seconds()), 0)),
 		},
 	}
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

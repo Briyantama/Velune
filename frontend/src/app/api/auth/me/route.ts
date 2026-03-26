@@ -3,15 +3,53 @@ import { NextResponse } from "next/server";
 import { ACCESS_COOKIE, REFRESH_COOKIE, cookieOptions } from "@/src/lib/auth/cookies";
 import type { MeResponse, TokenResponse } from "@/src/lib/api/backend-types";
 import { ApiError, ensureCorrelationId, gatewayFetch, readJsonOrThrow } from "@/src/lib/api/http";
+import { getConsentModeFromJar } from "@/src/services/authStorage";
 
 export async function GET() {
   const jar = await cookies();
-  const access = jar.get(ACCESS_COOKIE)?.value ?? "";
-  const refresh = jar.get(REFRESH_COOKIE)?.value ?? "";
-
   const reqHeaders = await headers();
   const cid = ensureCorrelationId(reqHeaders.get("x-correlation-id"));
 
+  const storageMode = getConsentModeFromJar(jar) ?? "cookie";
+  const authorization = reqHeaders.get("authorization") ?? "";
+  const accessHeader = authorization.startsWith("Bearer ") ? authorization.slice("Bearer ".length) : "";
+
+  if (storageMode === "localStorage") {
+    if (!accessHeader) {
+      return NextResponse.json(
+        { code: "AUTH_REQUIRED", message: "authentication required" },
+        { status: 401, headers: { "X-Correlation-ID": cid } },
+      );
+    }
+
+    const resp = await gatewayFetch({
+      path: "/api/v1/auth/me",
+      method: "GET",
+      accessToken: accessHeader,
+      correlationId: cid,
+      cache: "no-store",
+    });
+
+    try {
+      const me = await readJsonOrThrow<MeResponse>(resp);
+      return NextResponse.json(me, { headers: { "X-Correlation-ID": cid } });
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        return NextResponse.json(
+          { code: "SESSION_EXPIRED", message: "session expired" },
+          { status: 401, headers: { "X-Correlation-ID": cid } },
+        );
+      }
+
+      return NextResponse.json(
+        { code: "AUTH_VALIDATION_FAILED", message: "authentication validation failed" },
+        { status: 401, headers: { "X-Correlation-ID": cid } },
+      );
+    }
+  }
+
+  const access = jar.get(ACCESS_COOKIE)?.value ?? "";
+  const refresh = jar.get(REFRESH_COOKIE)?.value ?? "";
   if (!access || !refresh) {
     return NextResponse.json(
       { code: "AUTH_REQUIRED", message: "authentication required" },

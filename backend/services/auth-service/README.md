@@ -1,6 +1,6 @@
 # auth-service
 
-Auth identity, password hashing, JWT access tokens, and opaque refresh-token rotation.
+Auth identity with JWT access tokens, refresh-token rotation, and email OTP verification.
 
 All endpoints are under:
 `/api/v1/auth`
@@ -8,13 +8,14 @@ All endpoints are under:
 ## Endpoints
 
 1. `POST /api/v1/auth/register`
-Request:
+   Request:
 
 ```json
 {
   "email": "user@example.com",
   "password": "password123",
-  "baseCurrency": "USD"
+  "baseCurrency": "USD",
+  "displayName": "Optional Name"
 }
 ```
 
@@ -22,13 +23,48 @@ Response:
 
 ```json
 {
-  "access_token": "…",
-  "refresh_token": "…",
-  "expires_in": 86400
+  "message": "OTP sent"
 }
 ```
 
-2. `POST /api/v1/auth/login`
+2. `POST /api/v1/auth/verify-otp` (activates the account)
+
+Request:
+
+```json
+{
+  "email": "user@example.com",
+  "otp": "123456"
+}
+```
+
+Response:
+
+```json
+{
+  "message": "OTP verified"
+}
+```
+
+3. `POST /api/v1/auth/resend-otp`
+
+Request:
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+Response:
+
+```json
+{
+  "message": "OTP sent"
+}
+```
+
+4. `POST /api/v1/auth/login`
 
 Request:
 
@@ -49,7 +85,9 @@ Response:
 }
 ```
 
-3. `POST /api/v1/auth/refresh`
+Note: `POST /api/v1/auth/login` only works for users that have been verified via `verify-otp`.
+
+5. `POST /api/v1/auth/refresh`
 
 Request:
 
@@ -69,7 +107,7 @@ Response:
 }
 ```
 
-4. `GET /api/v1/auth/me`
+6. `GET /api/v1/auth/me`
 
 Headers:
 `Authorization: Bearer <access_token>`
@@ -94,6 +132,12 @@ auth-service uses shared configuration from environment:
 - `JWT_EXPIRY` (optional, default `24h`): access token TTL.
 - `MIGRATIONS_PATH` (optional, default `file://migrations`): where SQL migrations live.
 - `REFRESH_TOKEN_TTL` (optional, default `30d`): refresh token TTL.
+- `OTP_VALIDITY_SECONDS` (optional, default `300`): OTP validity duration in seconds.
+- `OTP_RESEND_COOLDOWN_SECONDS` (optional, default `30`): minimum delay between OTP resends.
+- `OTP_MAX_RESENDS` (optional, default `3`): max number of resend attempts.
+- `OTP_MAX_VERIFY_ATTEMPTS` (optional, default `3`): max number of OTP verification attempts.
+- SMTP (optional; if unset or incomplete, auth-service uses a dev stub sender):
+  - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TLS`
 
 The refresh token stored in Postgres is a hashed, opaque value; only the plaintext refresh token is returned to the client.
 
@@ -104,9 +148,17 @@ Direct to the service (docker-compose split stack exposes `8081`):
 ```bash
 BASE_URL="http://localhost:8081"
 
-ACCESS="$(curl -sS -X POST "$BASE_URL/api/v1/auth/register" \
+curl -sS -X POST "$BASE_URL/api/v1/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password123","baseCurrency":"USD"}' | jq -r .access_token)"
+  -d '{"email":"user@example.com","password":"password123","baseCurrency":"USD"}' | jq
+
+curl -sS -X POST "$BASE_URL/api/v1/auth/verify-otp" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","otp":"123456"}' | jq
+
+ACCESS="$(curl -sS -X POST "$BASE_URL/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}' | jq -r .access_token)"
 
 curl -sS -X GET "$BASE_URL/api/v1/auth/me" \
   -H "Authorization: Bearer $ACCESS" | jq

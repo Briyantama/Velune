@@ -1,7 +1,5 @@
 "use client";
 
-import * as React from "react";
-
 import { cn } from "@/src/lib/utils";
 
 type StatusVariant = "neutral" | "success" | "warning" | "error" | "info";
@@ -28,11 +26,10 @@ export function StatusBadge({
       className={cn(
         "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
         stylesByVariant[variant],
-        className
+        className,
       )}
     >
       {label}
     </span>
   );
 }
-

@@ -11,14 +11,19 @@ import { Label } from "@/src/components/ui/label";
 import { useApiToasts } from "@/src/lib/api/toast";
 import { registerSchema } from "@/src/features/auth/schema/authSchemas";
 import { FieldError, SafeJson } from "@/src/lib/utils";
+import { getConsentModeClient, saveLocalTokens, setSessionExpiresAtCookie } from "@/src/services/authStorage";
+import { useAppDispatch } from "@/src/store/hooks";
+import { setStatus } from "@/src/store/slices/authSlice";
+import type { TokenResponse } from "@/src/lib/api/backend-types";
 
 type Values = z.infer<typeof registerSchema>;
 
 export default function RegisterClient() {
   const toast = useApiToasts();
+  const dispatch = useAppDispatch();
   const form = useForm<Values>({
     resolver: zodResolver(registerSchema) as Resolver<Values, any, Values>,
-    defaultValues: { email: "", password: "", baseCurrency: "USD" },
+    defaultValues: { email: "", password: "", confirmPassword: "" },
   });
 
   return (
@@ -47,6 +52,15 @@ export default function RegisterClient() {
                   status: resp.status,
                 };
               }
+
+              const storageMode = getConsentModeClient() ?? "cookie";
+              if (storageMode === "localStorage") {
+                const tokens = json as TokenResponse;
+                if (!tokens?.access_token || !tokens?.refresh_token) throw new Error("register tokens missing");
+                saveLocalTokens(tokens);
+                setSessionExpiresAtCookie(tokens.expires_in);
+              }
+              dispatch(setStatus("authenticated"));
               window.location.href = "/dashboard";
             } catch (e) {
               toast.showError(e, "Register failed");
@@ -73,13 +87,14 @@ export default function RegisterClient() {
             <FieldError msg={form.formState.errors.password?.message} />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="baseCurrency">Base currency</Label>
+            <Label htmlFor="confirmPassword">Confirm Password</Label>
             <Input
-              id="baseCurrency"
-              placeholder="USD"
-              {...form.register("baseCurrency")}
+              id="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              {...form.register("confirmPassword")}
             />
-            <FieldError msg={form.formState.errors.baseCurrency?.message} />
+            <FieldError msg={form.formState.errors.confirmPassword?.message} />
           </div>
 
           <Button type="submit" disabled={form.formState.isSubmitting}>

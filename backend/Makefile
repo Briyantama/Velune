@@ -1,7 +1,9 @@
 # Run from repository root: backend/  (same folder as go.work)
 #   make help
-#   make deps           # Postgres + RabbitMQ + Redis (detached)
+#   make deps           # RabbitMQ (+ optional infra; see target)
 #   make run-auth       # in another terminal, after deps
+#
+# Ports (native + gateway upstreams): aligned with deploy/README and infra/docker-compose.yml.
 
 .PHONY: help deps deps-down deps-logs \
 	compose-legacy compose-split compose-down \
@@ -12,26 +14,46 @@
 
 ROOT := $(CURDIR)
 COMPOSE := docker compose -f $(ROOT)/infra/docker-compose.yml
-# Local Postgres/RabbitMQ ports (match infra/docker-compose.yml)
+
+# --- Host / DB
 PG_HOST ?= 127.0.0.1
 PG_PORT ?= 5432
 PG_USER ?= postgres
 PG_PASS ?= postgres
 PG_BASE := postgres://$(PG_USER):$(PG_PASS)@$(PG_HOST):$(PG_PORT)
+
+# --- HTTP (each service on its own port; avoids default 8080 clashes)
+HTTP_HOST_LISTEN ?= 127.0.0.1
+PORT_GATEWAY ?= 8080
+PORT_AUTH ?= 8081
+PORT_TRANSACTION ?= 8082
+PORT_CATEGORY ?= 8083
+PORT_BUDGET ?= 8084
+PORT_REPORT ?= 8085
+PORT_NOTIFICATION ?= 8086
+PORT_LEGACY ?= 8090
+PORT_ADMIN ?= 8099
+
+# --- Broker / cache (match infra/docker-compose.yml published ports)
+RABBIT_PORT ?= 5672
+REDIS_PORT ?= 6379
 JWT_SECRET ?= dev-only-change-me
 ADMIN_API_KEY ?= dev-admin-api-key
 ADMIN_INTERNAL_KEY ?= dev-admin-internal-key
-BROKER_URL ?= amqp://guest:guest@$(PG_HOST):5672/
+BROKER_URL ?= amqp://velune:velune@$(PG_HOST):$(RABBIT_PORT)/
 
 ## help: print targets
 help:
 	@echo "Velune backend — local development"
 	@echo ""
+	@echo "Ports (override with PORT_*=...): gateway $(PORT_GATEWAY), auth $(PORT_AUTH), transaction $(PORT_TRANSACTION), category $(PORT_CATEGORY), budget $(PORT_BUDGET), report $(PORT_REPORT), notification $(PORT_NOTIFICATION), legacy $(PORT_LEGACY), admin $(PORT_ADMIN)"
+	@echo "Infra: Postgres $(PG_PORT), RabbitMQ $(RABBIT_PORT), Redis $(REDIS_PORT)"
+	@echo ""
 	@echo "Infrastructure (Docker):"
-	@echo "  make deps           Postgres + RabbitMQ + Redis (init script creates DBs)"
+	@echo "  make deps           RabbitMQ (see Makefile; matches compose BROKER_URL)"
 	@echo "  make deps-down      stop infra containers"
 	@echo "  make deps-logs      follow infra logs"
-	@echo "  make compose-legacy legacy-api + postgres + redis (no RabbitMQ in stack)"
+	@echo "  make compose-legacy legacy-api + redis (see infra/docker-compose.yml)"
 	@echo "  make compose-split  full split stack + gateway (builds images)"
 	@echo "  make compose-down   docker compose down"
 	@echo ""
@@ -42,16 +64,16 @@ help:
 	@echo "  make test           go test ./... per module (best effort)"
 	@echo "  make fmt            go fmt ./... under shared + services"
 	@echo ""
-	@echo "Run services natively (need: make deps; set PG_HOST if not localhost):"
+	@echo "Run services natively (need: make deps; set PG_HOST if not 127.0.0.1):"
 	@echo "  make run-auth | run-transaction | run-budget | run-report"
 	@echo "  make run-notification | run-category | run-gateway | run-legacy | run-admin"
 	@echo ""
 	@echo "Other:"
 	@echo "  make chaos-test | test-sim | test-notification-integration"
 
-## deps: start Postgres (multi-DB init), RabbitMQ management UI :15672, Redis
+## deps: start RabbitMQ (management UI :15672); see infra/docker-compose.yml for full stack
 deps:
-	$(COMPOSE) up -d rabbitmq redis
+	$(COMPOSE) up -d rabbitmq --build
 
 ## deps-down: stop infra containers
 deps-down:
@@ -59,7 +81,7 @@ deps-down:
 
 ## deps-logs: follow infra
 deps-logs:
-	$(COMPOSE) logs -f rabbitmq redis
+	$(COMPOSE) logs -f rabbitmq
 
 ## compose-legacy: legacy API + DB + redis (see README)
 compose-legacy:
@@ -129,6 +151,8 @@ fmt:
 
 run-auth:
 	cd "$(ROOT)" && \
+	HTTP_HOST="$(HTTP_HOST_LISTEN)" \
+	HTTP_PORT="$(PORT_AUTH)" \
 	DATABASE_URL="$(PG_BASE)/velune_auth?sslmode=disable" \
 	JWT_SECRET="$(JWT_SECRET)" \
 	MIGRATIONS_PATH=file://services/auth-service/migrations \
@@ -137,6 +161,8 @@ run-auth:
 
 run-transaction:
 	cd "$(ROOT)" && \
+	HTTP_HOST="$(HTTP_HOST_LISTEN)" \
+	HTTP_PORT="$(PORT_TRANSACTION)" \
 	DATABASE_URL="$(PG_BASE)/velune_transaction?sslmode=disable" \
 	JWT_SECRET="$(JWT_SECRET)" \
 	MIGRATIONS_PATH=file://services/transaction-service/migrations \
@@ -152,10 +178,12 @@ run-transaction:
 
 run-budget:
 	cd "$(ROOT)" && \
+	HTTP_HOST="$(HTTP_HOST_LISTEN)" \
+	HTTP_PORT="$(PORT_BUDGET)" \
 	DATABASE_URL="$(PG_BASE)/velune_budget?sslmode=disable" \
 	JWT_SECRET="$(JWT_SECRET)" \
 	MIGRATIONS_PATH=file://services/budget-service/migrations \
-	TRANSACTION_SERVICE_URL=http://$(PG_HOST):8082 \
+	TRANSACTION_SERVICE_URL=http://$(PG_HOST):$(PORT_TRANSACTION) \
 	BROKER_URL="$(BROKER_URL)" \
 	BROKER_EXCHANGE=velune.events \
 	BROKER_ROUTING_KEY=notification.overspend.requested \
@@ -167,13 +195,17 @@ run-budget:
 
 run-report:
 	cd "$(ROOT)" && \
+	HTTP_HOST="$(HTTP_HOST_LISTEN)" \
+	HTTP_PORT="$(PORT_REPORT)" \
 	JWT_SECRET="$(JWT_SECRET)" \
-	TRANSACTION_SERVICE_URL=http://$(PG_HOST):8082 \
+	TRANSACTION_SERVICE_URL=http://$(PG_HOST):$(PORT_TRANSACTION) \
 	LOG_FORMAT=dev \
 	go run ./services/report-service/cmd/api
 
 run-notification:
 	cd "$(ROOT)" && \
+	HTTP_HOST="$(HTTP_HOST_LISTEN)" \
+	HTTP_PORT="$(PORT_NOTIFICATION)" \
 	DATABASE_URL="$(PG_BASE)/velune_notification?sslmode=disable" \
 	JWT_SECRET="$(JWT_SECRET)" \
 	MIGRATIONS_PATH=file://services/notification-service/migrations \
@@ -190,32 +222,37 @@ run-notification:
 
 run-category:
 	cd "$(ROOT)" && \
+	HTTP_HOST="$(HTTP_HOST_LISTEN)" \
+	HTTP_PORT="$(PORT_CATEGORY)" \
 	LOG_FORMAT=dev \
 	go run ./services/category-service/cmd/server
 
 run-gateway:
 	cd "$(ROOT)" && \
-	AUTH_SERVICE_URL=http://$(PG_HOST):8081 \
-	TRANSACTION_SERVICE_URL=http://$(PG_HOST):8082 \
-	CATEGORY_SERVICE_URL=http://$(PG_HOST):8083 \
-	BUDGET_SERVICE_URL=http://$(PG_HOST):8084 \
-	REPORT_SERVICE_URL=http://$(PG_HOST):8085 \
-	NOTIFICATION_SERVICE_URL=http://$(PG_HOST):8086 \
-	LEGACY_API_URL=http://$(PG_HOST):8090 \
+	HTTP_HOST="$(HTTP_HOST_LISTEN)" \
+	HTTP_PORT="$(PORT_GATEWAY)" \
+	AUTH_SERVICE_URL=http://$(PG_HOST):$(PORT_AUTH) \
+	TRANSACTION_SERVICE_URL=http://$(PG_HOST):$(PORT_TRANSACTION) \
+	CATEGORY_SERVICE_URL=http://$(PG_HOST):$(PORT_CATEGORY) \
+	BUDGET_SERVICE_URL=http://$(PG_HOST):$(PORT_BUDGET) \
+	REPORT_SERVICE_URL=http://$(PG_HOST):$(PORT_REPORT) \
+	NOTIFICATION_SERVICE_URL=http://$(PG_HOST):$(PORT_NOTIFICATION) \
+	LEGACY_API_URL=http://$(PG_HOST):$(PORT_LEGACY) \
 	LOG_FORMAT=dev \
 	go run ./services/api-gateway/cmd/server
 
 run-legacy:
 	cd "$(ROOT)" && \
-	HTTP_HOST=0.0.0.0 \
-	HTTP_PORT=8090 \
+	HTTP_HOST="$(HTTP_HOST_LISTEN)" \
+	HTTP_PORT="$(PORT_LEGACY)" \
 	JWT_SECRET="$(JWT_SECRET)" \
 	LOG_FORMAT=dev \
 	go run ./services/legacy-api/cmd/api
 
 run-admin:
 	cd "$(ROOT)" && \
-	HTTP_PORT=8099 \
+	HTTP_HOST="$(HTTP_HOST_LISTEN)" \
+	HTTP_PORT="$(PORT_ADMIN)" \
 	ADMIN_API_KEY="$(ADMIN_API_KEY)" \
 	ADMIN_INTERNAL_KEY="$(ADMIN_INTERNAL_KEY)" \
 	TRANSACTION_DATABASE_URL="$(PG_BASE)/velune_transaction?sslmode=disable" \
@@ -227,12 +264,12 @@ run-admin:
 	BROKER_DLX=velune.events.dlx \
 	BROKER_DLQ=velune.events.dlq \
 	BROKER_DLQ_ROUTING_KEY=velune.dlq \
-	AUTH_SERVICE_URL=http://$(PG_HOST):8081 \
-	TRANSACTION_SERVICE_URL=http://$(PG_HOST):8082 \
-	CATEGORY_SERVICE_URL=http://$(PG_HOST):8083 \
-	BUDGET_SERVICE_URL=http://$(PG_HOST):8084 \
-	REPORT_SERVICE_URL=http://$(PG_HOST):8085 \
-	NOTIFICATION_SERVICE_URL=http://$(PG_HOST):8086 \
+	AUTH_SERVICE_URL=http://$(PG_HOST):$(PORT_AUTH) \
+	TRANSACTION_SERVICE_URL=http://$(PG_HOST):$(PORT_TRANSACTION) \
+	CATEGORY_SERVICE_URL=http://$(PG_HOST):$(PORT_CATEGORY) \
+	BUDGET_SERVICE_URL=http://$(PG_HOST):$(PORT_BUDGET) \
+	REPORT_SERVICE_URL=http://$(PG_HOST):$(PORT_REPORT) \
+	NOTIFICATION_SERVICE_URL=http://$(PG_HOST):$(PORT_NOTIFICATION) \
 	LOG_FORMAT=dev \
 	go run ./services/admin-service/cmd/api
 

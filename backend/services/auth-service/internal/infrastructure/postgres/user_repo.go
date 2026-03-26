@@ -24,15 +24,27 @@ func NewUserRepo(s *Store) repository.UserRepository {
 }
 
 func (r *UserRepo) Create(ctx context.Context, u *domain.User) error {
+	var emailVerifiedAt pgtype.Timestamptz
+	if u.EmailVerifiedAt != nil {
+		emailVerifiedAt = pgtype.Timestamptz{
+			Time:  *u.EmailVerifiedAt,
+			Valid: true,
+		}
+	} else {
+		emailVerifiedAt = pgtype.Timestamptz{Valid: false}
+	}
 	return r.s.Queries.CreateUser(ctx, db.CreateUserParams{
 		ID: pgtype.UUID{
 			Bytes: u.ID,
 			Valid: true,
 		},
-		Email:        stringx.Lower(u.Email),
-		PasswordHash: u.PasswordHash,
-		BaseCurrency: stringx.Upper(u.BaseCurrency),
-		Version:      u.Version,
+		Email:           stringx.Lower(u.Email),
+		PasswordHash:    u.PasswordHash,
+		BaseCurrency:    stringx.Upper(u.BaseCurrency),
+		Status:          u.Status,
+		EmailVerifiedAt: emailVerifiedAt,
+		DisplayName:     u.DisplayName,
+		Version:         u.Version,
 		CreatedAt: pgtype.Timestamptz{
 			Time:  u.CreatedAt,
 			Valid: true,
@@ -67,10 +79,19 @@ func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, err
 		Email:        u.Email,
 		PasswordHash: u.PasswordHash,
 		BaseCurrency: u.BaseCurrency,
-		Version:      u.Version,
-		CreatedAt:    u.CreatedAt.Time,
-		UpdatedAt:    u.UpdatedAt.Time,
-		DeletedAt:    deletedAt,
+		Status:       u.Status,
+		EmailVerifiedAt: func() *time.Time {
+			if u.EmailVerifiedAt.Valid {
+				t := u.EmailVerifiedAt.Time
+				return &t
+			}
+			return nil
+		}(),
+		DisplayName: u.DisplayName,
+		Version:     u.Version,
+		CreatedAt:   u.CreatedAt.Time,
+		UpdatedAt:   u.UpdatedAt.Time,
+		DeletedAt:   deletedAt,
 	}, nil
 }
 
@@ -94,9 +115,25 @@ func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, 
 		Email:        u.Email,
 		PasswordHash: u.PasswordHash,
 		BaseCurrency: u.BaseCurrency,
-		Version:      u.Version,
-		CreatedAt:    u.CreatedAt.Time,
-		UpdatedAt:    u.UpdatedAt.Time,
-		DeletedAt:    deletedAt,
+		Status:       u.Status,
+		EmailVerifiedAt: func() *time.Time {
+			if u.EmailVerifiedAt.Valid {
+				t := u.EmailVerifiedAt.Time
+				return &t
+			}
+			return nil
+		}(),
+		DisplayName: u.DisplayName,
+		Version:     u.Version,
+		CreatedAt:   u.CreatedAt.Time,
+		UpdatedAt:   u.UpdatedAt.Time,
+		DeletedAt:   deletedAt,
 	}, nil
+}
+
+func (r *UserRepo) ActivateAfterOTP(ctx context.Context, userID uuid.UUID) error {
+	return r.s.Queries.UserActivateAfterOTP(ctx, pgtype.UUID{
+		Bytes: userID,
+		Valid: true,
+	})
 }

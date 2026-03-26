@@ -15,6 +15,7 @@ import (
 	"github.com/moon-eye/velune/services/auth-service/internal/usecase"
 	errs "github.com/moon-eye/velune/shared/errors"
 	"github.com/moon-eye/velune/shared/jwt"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -22,6 +23,7 @@ type mockUserRepo struct {
 	getByEmailFn func(ctx context.Context, email string) (*domain.User, error)
 	getByIDFn    func(ctx context.Context, id uuid.UUID) (*domain.User, error)
 	createFn     func(ctx context.Context, u *domain.User) error
+	activateFn   func(ctx context.Context, userID uuid.UUID) error
 }
 
 func (m *mockUserRepo) Create(ctx context.Context, u *domain.User) error {
@@ -43,6 +45,13 @@ func (m *mockUserRepo) GetByEmail(ctx context.Context, email string) (*domain.Us
 		return nil, nil
 	}
 	return m.getByEmailFn(ctx, email)
+}
+
+func (m *mockUserRepo) ActivateAfterOTP(ctx context.Context, userID uuid.UUID) error {
+	if m.activateFn == nil {
+		return nil
+	}
+	return m.activateFn(ctx, userID)
 }
 
 type rotateCall struct {
@@ -98,14 +107,83 @@ func sha256Hex(s string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+type mockOTPRepo struct {
+	getLatestIssuedFn   func(ctx context.Context, userID uuid.UUID) (*time.Time, int, error)
+	getLatestUnconsFn   func(ctx context.Context, userID uuid.UUID) (*domain.OTPVerification, error)
+	invalidateFn        func(ctx context.Context, userID uuid.UUID) error
+	consumeByIDFn       func(ctx context.Context, otpID uuid.UUID) error
+	incrementAttemptFn  func(ctx context.Context, otpID uuid.UUID) error
+	consumeIfExceededFn func(ctx context.Context, otpID uuid.UUID, maxAttempts int) (int64, error)
+	createFn            func(ctx context.Context, otp *domain.OTPVerification) error
+}
+
+func (m *mockOTPRepo) Create(ctx context.Context, otp *domain.OTPVerification) error {
+	if m.createFn == nil {
+		return nil
+	}
+	return m.createFn(ctx, otp)
+}
+
+func (m *mockOTPRepo) GetLatestUnconsumed(ctx context.Context, userID uuid.UUID) (*domain.OTPVerification, error) {
+	if m.getLatestUnconsFn == nil {
+		return nil, nil
+	}
+	return m.getLatestUnconsFn(ctx, userID)
+}
+
+func (m *mockOTPRepo) InvalidateUnconsumedForUser(ctx context.Context, userID uuid.UUID) error {
+	if m.invalidateFn == nil {
+		return nil
+	}
+	return m.invalidateFn(ctx, userID)
+}
+
+func (m *mockOTPRepo) ConsumeByID(ctx context.Context, otpID uuid.UUID) error {
+	if m.consumeByIDFn == nil {
+		return nil
+	}
+	return m.consumeByIDFn(ctx, otpID)
+}
+
+func (m *mockOTPRepo) IncrementAttempt(ctx context.Context, otpID uuid.UUID) error {
+	if m.incrementAttemptFn == nil {
+		return nil
+	}
+	return m.incrementAttemptFn(ctx, otpID)
+}
+
+func (m *mockOTPRepo) ConsumeIfAttemptsExceeded(ctx context.Context, otpID uuid.UUID, maxAttempts int) (int64, error) {
+	if m.consumeIfExceededFn == nil {
+		return 0, nil
+	}
+	return m.consumeIfExceededFn(ctx, otpID, maxAttempts)
+}
+
+func (m *mockOTPRepo) GetLatestIssuedMeta(ctx context.Context, userID uuid.UUID) (*time.Time, int, error) {
+	if m.getLatestIssuedFn == nil {
+		return nil, 0, nil
+	}
+	return m.getLatestIssuedFn(ctx, userID)
+}
+
+type mockOTPSender struct {
+	sendFn func(ctx context.Context, toEmail string, otpCode string, expiresAt time.Time) error
+}
+
+func (m *mockOTPSender) SendOTP(ctx context.Context, toEmail string, otpCode string, expiresAt time.Time) error {
+	if m == nil || m.sendFn == nil {
+		return nil
+	}
+	return m.sendFn(ctx, toEmail, otpCode, expiresAt)
+}
+
 func TestRegister_Success(t *testing.T) {
 	ctx := context.Background()
-	jwtSecret := "test-secret"
-	accessTTL := 2 * time.Hour
-	refreshTTL := 30 * 24 * time.Hour
 
 	var createdUserID uuid.UUID
-	var storedRefreshTokenHash string
+	var storedOTPHash string
+	otpCodeCh := make(chan string, 1)
+	otpRowCreated := make(chan struct{}, 1)
 
 	userRepo := &mockUserRepo{
 		getByEmailFn: func(ctx context.Context, email string) (*domain.User, error) {
@@ -119,31 +197,55 @@ func TestRegister_Success(t *testing.T) {
 			if u.PasswordHash == "" || u.PasswordHash == "password123" {
 				t.Fatalf("expected hashed password, got %q", u.PasswordHash)
 			}
+			if u.Status != "pending" {
+				t.Fatalf("expected status pending, got %q", u.Status)
+			}
+			if u.BaseCurrency != "USD" {
+				t.Fatalf("expected base currency USD, got %q", u.BaseCurrency)
+			}
 			return nil
 		},
 	}
 
-	refreshRepo := &mockRefreshRepo{
-		storeFn: func(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) error {
-			storedRefreshTokenHash = tokenHash
-			if userID != createdUserID {
-				t.Fatalf("expected refresh for user %s, got %s", createdUserID, userID)
+	otpRepo := &mockOTPRepo{
+		getLatestIssuedFn: func(ctx context.Context, userID uuid.UUID) (*time.Time, int, error) {
+			return nil, 0, nil
+		},
+		invalidateFn: func(ctx context.Context, userID uuid.UUID) error {
+			return nil
+		},
+		createFn: func(ctx context.Context, otp *domain.OTPVerification) error {
+			storedOTPHash = otp.OtpHash
+			if otp.UserID != createdUserID {
+				t.Fatalf("expected otp for user %s, got %s", createdUserID, otp.UserID)
 			}
-			// Token should expire around now + refreshTTL.
-			d := time.Until(expiresAt)
-			if d < refreshTTL-time.Minute || d > refreshTTL+time.Minute {
-				t.Fatalf("unexpected refresh token ttl: %s (expected ~%s)", d, refreshTTL)
+			if otp.ResendCount != 0 {
+				t.Fatalf("expected initial resendCount=0, got %d", otp.ResendCount)
 			}
+			otpRowCreated <- struct{}{}
+			return nil
+		},
+	}
+
+	otpSender := &mockOTPSender{
+		sendFn: func(ctx context.Context, toEmail string, otpCode string, expiresAt time.Time) error {
+			if toEmail != "user@example.com" {
+				t.Fatalf("expected otp sent to normalized email, got %q", toEmail)
+			}
+			otpCodeCh <- otpCode
 			return nil
 		},
 	}
 
 	svc := &usecase.AuthService{
-		Users:         userRepo,
-		RefreshTokens: refreshRepo,
-		JWTSecret:     jwtSecret,
-		AccessTTL:     accessTTL,
-		RefreshTTL:    refreshTTL,
+		Log:                  zap.NewNop(),
+		Users:                userRepo,
+		OTPVerifications:     otpRepo,
+		OTPSender:            otpSender,
+		OTPValidity:          5 * time.Minute,
+		OTPResendCooldown:    30 * time.Second,
+		OTPMaxResends:        3,
+		OTPMaxVerifyAttempts: 3,
 	}
 
 	resp, err := svc.Register(ctx, usecase.RegisterInput{
@@ -154,23 +256,29 @@ func TestRegister_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected success, got error: %v", err)
 	}
-	if resp.AccessToken == "" || resp.RefreshToken == "" {
-		t.Fatalf("expected access and refresh tokens")
-	}
-	if resp.ExpiresIn != int64(accessTTL.Seconds()) {
-		t.Fatalf("unexpected expires_in: %d", resp.ExpiresIn)
+	if resp.Message != "OTP sent" {
+		t.Fatalf("expected message 'OTP sent', got %q", resp.Message)
 	}
 
-	claims, err := jwt.Parse(resp.AccessToken, jwtSecret)
-	if err != nil {
-		t.Fatalf("expected valid access token, got error: %v", err)
-	}
-	if claims.UserID != createdUserID {
-		t.Fatalf("expected uid %s, got %s", createdUserID, claims.UserID)
+	select {
+	case <-otpRowCreated:
+		// ok
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for otp verification row creation")
 	}
 
-	if storedRefreshTokenHash != sha256Hex(resp.RefreshToken) {
-		t.Fatalf("expected stored hash to match refresh token hash")
+	var otpCode string
+	select {
+	case otpCode = <-otpCodeCh:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for otp delivery")
+	}
+
+	if storedOTPHash == "" {
+		t.Fatalf("expected stored otp hash to be set")
+	}
+	if storedOTPHash != sha256Hex(otpCode) {
+		t.Fatalf("expected stored otp hash to match delivered otp code")
 	}
 }
 

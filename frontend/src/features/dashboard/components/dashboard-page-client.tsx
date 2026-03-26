@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/src/components/common/page-header";
@@ -22,9 +21,9 @@ import {
 } from "@/src/features/transactions/services/transactionsApi";
 
 export default function DashboardPageClient() {
-  const currency = "USD";
+  const currency = "IDR";
   const now = new Date();
-  const from = new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString();
+  const from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const to = now.toISOString();
 
   const accountsQ = useQuery({

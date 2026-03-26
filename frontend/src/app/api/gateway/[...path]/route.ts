@@ -7,7 +7,7 @@ import { SafeJson } from "@/src/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-type RouteCtx = { params: { path: string[] } };
+type RouteCtx = { params: Promise<{ path: string[] }> };
 
 export async function GET(req: Request, ctx: RouteCtx) {
   return proxy(req, ctx);
@@ -31,7 +31,8 @@ async function proxy(req: Request, ctx: RouteCtx) {
   const cid = ensureCorrelationId(inboundHeaders.get("x-correlation-id"));
 
   const url = new URL(req.url);
-  const path = "/api/v1/" + ctx.params.path.join("/");
+  const params = await ctx.params;
+  const path = "/api/v1/" + params.path.join("/");
   const upstreamPath = path + (url.search ? url.search : "");
 
   const method = req.method.toUpperCase();
@@ -40,7 +41,10 @@ async function proxy(req: Request, ctx: RouteCtx) {
   const body =
     hasBody && contentType.includes("application/json") ? ((await req.json()) as unknown) : undefined;
 
-  const access = jar.get(ACCESS_COOKIE)?.value ?? "";
+  const authorization = inboundHeaders.get("authorization") ?? "";
+  const accessHeader = authorization.startsWith("Bearer ") ? authorization.slice("Bearer ".length) : "";
+  const accessCookie = jar.get(ACCESS_COOKIE)?.value ?? "";
+  const access = accessCookie || accessHeader;
   const first = await gatewayFetch({
     path: upstreamPath,
     method,

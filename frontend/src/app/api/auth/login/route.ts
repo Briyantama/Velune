@@ -3,10 +3,12 @@ import { NextResponse } from "next/server";
 import { ACCESS_COOKIE, REFRESH_COOKIE, cookieOptions } from "@/src/lib/auth/cookies";
 import type { TokenResponse } from "@/src/lib/api/backend-types";
 import { ensureCorrelationId, gatewayFetch, readJsonOrThrow } from "@/src/lib/api/http";
+import { getConsentModeFromJar } from "@/src/services/authStorage";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as { email: string; password: string };
-  const cid = ensureCorrelationId(headers().get("x-correlation-id"));
+  const reqHeaders = await headers();
+  const cid = ensureCorrelationId(reqHeaders.get("x-correlation-id"));
 
   const resp = await gatewayFetch({
     path: "/api/v1/auth/login",
@@ -16,7 +18,13 @@ export async function POST(req: Request) {
   });
 
   const tokens = await readJsonOrThrow<TokenResponse>(resp);
-  const jar = cookies();
+  const jar = await cookies();
+
+  const storageMode = getConsentModeFromJar(jar) ?? "cookie";
+  if (storageMode === "localStorage") {
+    // Reject cookies mode: do not set httpOnly cookies; client stores tokens in localStorage.
+    return NextResponse.json(tokens, { headers: { "X-Correlation-ID": cid } });
+  }
 
   jar.set(ACCESS_COOKIE, tokens.access_token, {
     ...cookieOptions(),

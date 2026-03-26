@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { ThemeProvider } from "@/src/components/providers/theme-provider";
 import { QueryProvider } from "@/src/components/providers/query-provider";
 import { Toaster } from "@/src/components/ui/toaster";
+import { ReduxProvider } from "@/src/store/ReduxProvider";
+import { ConsentGate } from "@/src/components/auth/ConsentGate";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,7 +17,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ThemeProvider>
           <Toaster>
-            <QueryProvider>{children}</QueryProvider>
+            <ReduxProvider>
+              <QueryProvider>
+                <ConsentGate>{children}</ConsentGate>
+              </QueryProvider>
+            </ReduxProvider>
           </Toaster>
         </ThemeProvider>
       </body>

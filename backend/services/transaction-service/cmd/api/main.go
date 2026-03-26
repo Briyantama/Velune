@@ -28,6 +28,7 @@ import (
 	"github.com/moon-eye/velune/shared/sim"
 	db "github.com/moon-eye/velune/shared/sqlc/generated"
 	stringx "github.com/moon-eye/velune/shared/stringx"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
 
@@ -118,6 +119,83 @@ func main() {
 					log.Error("outbox dispatch failed", append(sharedlog.FieldsFromContext(ctx), zap.Error(err))...)
 				}
 			}
+		}
+	}()
+
+	// Provision default accounts on first active login (auth-service -> broker event).
+	provisioningSvc := usecase.NewProvisioningService(store.Pool)
+	provisionQueueName := os.Getenv("TX_PROVISION_REQUEST_QUEUE")
+	if provisionQueueName == "" {
+		provisionQueueName = "transaction.provision_requested"
+	}
+	provisionRoutingKey := contracts.EventUserFirstLoginProvisionRequested
+	go func() {
+		conn, err := amqp.Dial(cfg.BrokerURL)
+		if err != nil {
+			log.Error("rabbit_provision_consumer_dial_failed", zap.Error(err))
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		ch, err := conn.Channel()
+		if err != nil {
+			log.Error("rabbit_provision_consumer_channel_failed", zap.Error(err))
+			return
+		}
+		defer func() { _ = ch.Close() }()
+
+		if err := ch.ExchangeDeclare(cfg.BrokerExchange, "topic", true, false, false, false, nil); err != nil {
+			log.Error("rabbit_provision_consumer_exchange_declare_failed", zap.Error(err))
+			return
+		}
+
+		args := amqp.Table{}
+		if cfg.BrokerDLX != "" {
+			args["x-dead-letter-exchange"] = cfg.BrokerDLX
+			if cfg.BrokerDLQRoutingKey != "" {
+				args["x-dead-letter-routing-key"] = cfg.BrokerDLQRoutingKey
+			}
+		}
+
+		q, err := ch.QueueDeclare(provisionQueueName, true, false, false, false, args)
+		if err != nil {
+			log.Error("rabbit_provision_consumer_queue_declare_failed", zap.Error(err))
+			return
+		}
+		if err := ch.QueueBind(q.Name, provisionRoutingKey, cfg.BrokerExchange, false, nil); err != nil {
+			log.Error("rabbit_provision_consumer_queue_bind_failed", zap.Error(err))
+			return
+		}
+
+		msgs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
+		if err != nil {
+			log.Error("rabbit_provision_consumer_consume_failed", zap.Error(err))
+			return
+		}
+
+		log.Info("rabbit_provision_consumer_started", zap.String("queue", q.Name), zap.String("routingKey", provisionRoutingKey))
+		for msg := range msgs {
+			var env contracts.EventEnvelope
+			if err := json.Unmarshal(msg.Body, &env); err != nil {
+				_ = msg.Nack(false, true)
+				continue
+			}
+			if env.EventType != provisionRoutingKey {
+				_ = msg.Ack(false)
+				continue
+			}
+
+			var payload contracts.UserFirstLoginProvisionRequested
+			if err := json.Unmarshal(env.Payload, &payload); err != nil {
+				_ = msg.Nack(false, true)
+				continue
+			}
+
+			if err := provisioningSvc.ProvisionDefaultAccountsIfNeeded(ctx, payload); err != nil {
+				log.Error("provision_default_accounts_failed", zap.Error(err), zap.String("user_id", payload.UserID.String()))
+				_ = msg.Nack(false, true)
+				continue
+			}
+			_ = msg.Ack(false)
 		}
 	}()
 
