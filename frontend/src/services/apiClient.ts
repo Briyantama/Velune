@@ -22,9 +22,12 @@ async function parseError(resp: Response): Promise<ClientError> {
   const text = await resp.text();
   const json = text ? (SafeJson(text) as any) : undefined;
 
-  const code = typeof json?.code === "string" && json.code ? json.code : "HTTP_ERROR";
+  const code =
+    typeof json?.code === "string" && json.code ? json.code : `HTTP_${resp.status || "ERROR"}`;
   const message =
-    typeof json?.message === "string" && json.message ? json.message : `Request failed (${resp.status})`;
+    (typeof json?.error === "string" && json.error && json.error) ||
+    (typeof json?.message === "string" && json.message && json.message) ||
+    `Request failed (${resp.status})`;
 
   return { code, message, status: resp.status };
 }
@@ -90,7 +93,7 @@ export async function apiRequest<T>(input: {
   if (resp.ok) {
     const text = await resp.text();
     const json = text ? SafeJson(text) : undefined;
-    return camelizeKeysDeep<T>(json);
+    return camelizeKeysDeep<T>((json as any)?.data ?? json);
   }
 
   if (resp.status === 401) {
@@ -112,7 +115,7 @@ export async function apiRequest<T>(input: {
       if (retryResp.ok) {
         const text = await retryResp.text();
         const json = text ? SafeJson(text) : undefined;
-        return camelizeKeysDeep<T>(json);
+        return camelizeKeysDeep<T>((json as any)?.data ?? json);
       }
     } catch {
       // Fall through to normalized 401 error.

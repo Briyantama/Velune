@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"
@@ -74,8 +73,10 @@ func main() {
 }
 
 func health(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"status":"ok","service":"api-gateway"}`))
+	httpx.WriteJSON(w, constx.StatusOK, map[string]string{
+		"status":  "ok",
+		"service": "api-gateway",
+	})
 }
 
 func instrumentGateway(cfg *sharedconfig.Service, log *zap.Logger, next http.Handler) http.Handler {
@@ -109,8 +110,15 @@ func classifyRoute(cfg *sharedconfig.Service, path string) string {
 
 func routesHandler(cfg *sharedconfig.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"auth":"` + cfg.AuthServiceURL + `","transaction":"` + cfg.TransactionServiceURL + `","category":"` + cfg.CategoryServiceURL + `","budget":"` + cfg.BudgetServiceURL + `","report":"` + cfg.ReportServiceURL + `","notification":"` + cfg.NotificationServiceURL + `","legacy":"` + os.Getenv("LEGACY_API_URL") + `"}`))
+		httpx.WriteJSON(w, constx.StatusOK, map[string]string{
+			"auth":         cfg.AuthServiceURL,
+			"transaction":  cfg.TransactionServiceURL,
+			"category":     cfg.CategoryServiceURL,
+			"budget":       cfg.BudgetServiceURL,
+			"report":       cfg.ReportServiceURL,
+			"notification": cfg.NotificationServiceURL,
+			"legacy":       os.Getenv("LEGACY_API_URL"),
+		})
 	}
 }
 
@@ -154,16 +162,12 @@ func catchAllHandler(cfg *sharedconfig.Service, log *zap.Logger) http.HandlerFun
 			httpx.MustProxy(leg).ServeHTTP(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(constx.StatusNotFound)
-		_, _ = w.Write([]byte(`{"code":"NOT_FOUND","message":"no upstream configured for path"}`))
+		httpx.WriteJSON(w, constx.StatusNotFound, nil)
 	}
 }
 
 func writeGatewayError(w http.ResponseWriter, code, message string, status int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"code": code, "message": message})
+	httpx.WriteJSON(w, status, nil)
 }
 
 func pickProxy(cfg *sharedconfig.Service, path string) http.Handler {

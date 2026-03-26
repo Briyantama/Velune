@@ -12,7 +12,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	sharedconfig "github.com/moon-eye/velune/shared/config"
+	constx "github.com/moon-eye/velune/shared/constx"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
+	httpx "github.com/moon-eye/velune/shared/httpx"
 	"github.com/moon-eye/velune/shared/metrics"
 	"github.com/moon-eye/velune/shared/middlewares"
 	"github.com/moon-eye/velune/shared/otelx"
@@ -33,14 +35,18 @@ func main() {
 	r.Use(middlewares.CorrelationIDHeader)
 	r.Use(middleware.RealIP, middleware.Recoverer)
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"ok","service":"category-service"}`))
+		httpx.WriteJSON(w, constx.StatusOK, map[string]string{
+			"status":  "ok",
+			"service": "category-service",
+		})
 	})
 	r.Handle("/metrics", metrics.Handler())
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/meta", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"service":"category-service","version":"0.1.0"}`))
+			httpx.WriteJSON(w, constx.StatusOK, map[string]string{
+				"service": "category-service",
+				"version": "0.1.0",
+			})
 		})
 	})
 	addr := cfg.HTTPHost + ":" + cfg.HTTPPort

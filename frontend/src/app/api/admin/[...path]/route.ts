@@ -9,7 +9,7 @@ import { getConsentModeFromJar } from "@/src/services/authStorage";
 
 export const dynamic = "force-dynamic";
 
-type RouteCtx = { params: { path: string[] } };
+type RouteCtx = { params: Promise<{ path: string[] }> };
 
 export async function GET(req: Request, ctx: RouteCtx) {
   return proxy(req, ctx);
@@ -124,7 +124,8 @@ async function proxy(req: Request, ctx: RouteCtx) {
   }
 
   const url = new URL(req.url);
-  const upstream = new URL(serverEnv.adminServiceUrl + "/" + ctx.params.path.join("/"));
+  const params = await ctx.params;
+  const upstream = new URL(serverEnv.adminServiceUrl + "/" + params.path.join("/"));
   upstream.search = url.search;
 
   const method = req.method.toUpperCase();

@@ -1,7 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { ACCESS_COOKIE, REFRESH_COOKIE, cookieOptions } from "@/src/lib/auth/cookies";
-import type { BackendError, TokenResponse } from "@/src/lib/api/backend-types";
+import type { TokenResponse } from "@/src/lib/api/backend-types";
 import { ensureCorrelationId, gatewayFetch } from "@/src/lib/api/http";
 import { SafeJson } from "@/src/lib/utils";
 
@@ -116,14 +116,6 @@ async function passthrough(resp: Response, cid: string) {
   };
 
   if (!raw) return new NextResponse(null, init);
-
-  // Normalize errors to backend `{code,message}` when possible.
-  if (resp.status >= 400 && contentType.includes("application/json")) {
-    const parsed = SafeJson(raw) as Partial<BackendError> | undefined;
-    if (parsed?.code && parsed?.message) {
-      return NextResponse.json({ code: parsed.code, message: parsed.message }, init);
-    }
-  }
 
   if (contentType.includes("application/json")) {
     const parsed = SafeJson(raw);

@@ -64,6 +64,9 @@ func RequestIDHeader(next http.Handler) http.Handler {
 // CorrelationIDHeader ensures X-Correlation-ID exists and stores it in context with X-Request-ID.
 func CorrelationIDHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Used by shared/httpx response helpers to automatically populate the envelope `path`.
+		w.Header().Set("X-Request-Path", r.URL.Path)
+
 		cid := stringx.TrimSpace(r.Header.Get("X-Correlation-ID"))
 		if cid == "" {
 			cid = uuid.New().String()

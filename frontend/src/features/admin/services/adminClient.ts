@@ -34,8 +34,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   const parseAndThrow = () => {
     const err: ClientError = {
-      code: (json as any)?.code ?? "HTTP_ERROR",
-      message: (json as any)?.message ?? `Request failed (${resp.status})`,
+      code: typeof (json as any)?.code === "string" && (json as any)?.code ? (json as any)?.code : `HTTP_${resp.status}`,
+      message:
+        typeof (json as any)?.error === "string" && (json as any)?.error
+          ? (json as any)?.error
+          : typeof (json as any)?.message === "string" && (json as any)?.message
+            ? (json as any)?.message
+            : `Request failed (${resp.status})`,
       status: resp.status
     };
     throw err;
@@ -84,21 +89,29 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
       if (!retryResp.ok) {
         const err: ClientError = {
-          code: (retryJson as any)?.code ?? "HTTP_ERROR",
-          message: (retryJson as any)?.message ?? `Request failed (${retryResp.status})`,
+          code:
+            typeof (retryJson as any)?.code === "string" && (retryJson as any)?.code
+              ? (retryJson as any)?.code
+              : `HTTP_${retryResp.status}`,
+          message:
+            typeof (retryJson as any)?.error === "string" && (retryJson as any)?.error
+              ? (retryJson as any)?.error
+              : typeof (retryJson as any)?.message === "string" && (retryJson as any)?.message
+                ? (retryJson as any)?.message
+                : `Request failed (${retryResp.status})`,
           status: retryResp.status,
         };
         throw err;
       }
 
-      return camelizeKeysDeep<T>(retryJson);
+      return camelizeKeysDeep<T>((retryJson as any)?.data ?? retryJson);
     } catch {
       parseAndThrow();
     }
   }
 
   if (!resp.ok) parseAndThrow();
-  return camelizeKeysDeep<T>(json);
+  return camelizeKeysDeep<T>((json as any)?.data ?? json);
 }
 
 function stripLeadingSlash(p: string) {

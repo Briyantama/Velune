@@ -20,6 +20,31 @@ export async function DELETE(req: Request, ctx: RouteCtx) {
   return proxy(req, ctx);
 }
 
+async function proxy(req: Request, ctx: RouteCtx): Promise<Response> {
+  const url = new URL(req.url);
+  const path = "/api/v1/" + ctx.params.path.join("/");
+  const upstreamPath = path + (url.search ? url.search : "");
+
+  const method = req.method.toUpperCase();
+  const contentType = req.headers.get("content-type") ?? "";
+  const hasBody = method !== "GET" && method !== "HEAD" && method !== "DELETE";
+
+  const body =
+    hasBody && contentType.includes("application/json") ? ((await req.json()) as unknown) : undefined;
+
+  const authorization = req.headers.get("authorization") ?? "";
+  const accessToken = authorization.startsWith("Bearer ") ? authorization.slice("Bearer ".length) : undefined;
+  const cid = ensureCorrelationId(req.headers.get("x-correlation-id"));
+
+  return gatewayFetch({
+    path: upstreamPath,
+    method,
+    accessToken,
+    correlationId: cid,
+    body
+  });
+}
+
 export class ApiError extends Error {
   code: string;
   status: number;
@@ -65,12 +90,19 @@ export async function readJsonOrThrow<T>(resp: Response): Promise<T> {
   const json = text ? SafeJson(text) : undefined;
 
   if (resp.ok) {
-    return json as T;
+    // Backend responses are standardized as `{ data: ... }` envelopes.
+    const payload = (json as any)?.data ?? json;
+    return payload as T;
   }
 
   const be = (json ?? {}) as Partial<BackendError>;
-  const code = typeof be.code === "string" && be.code ? be.code : "HTTP_ERROR";
+  const code =
+    typeof be.code === "string" && be.code
+      ? be.code
+      : `HTTP_${resp.status}`;
   const message =
-    typeof be.message === "string" && be.message ? be.message : `Request failed (${resp.status})`;
+    (typeof be.error === "string" && be.error && be.error) ||
+    (typeof be.message === "string" && be.message && be.message) ||
+    `Request failed (${resp.status})`;
   throw new ApiError({ code, message, status: resp.status });
 }

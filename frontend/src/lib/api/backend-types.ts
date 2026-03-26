@@ -1,6 +1,13 @@
+// BackendError represents either the new standardized envelope error shape
+// (`{ error, status, requestId, ... }`) or the legacy `{ code, message, ... }` shape.
 export type BackendError = {
-  code: string;
-  message: string;
+  error?: string;
+  status?: number;
+  requestId?: string;
+
+  // Legacy compatibility (some Next routes may still return this shape).
+  code?: string;
+  message?: string;
 };
 
 export type TokenResponse = {

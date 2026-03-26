@@ -113,7 +113,7 @@ func MustProxy(origin string) http.Handler {
 	u, err := url.Parse(origin)
 	if err != nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "bad upstream URL", constx.StatusInternalServerError)
+			WriteJSON(w, constx.StatusInternalServerError, nil)
 		})
 	}
 	return singleHostReverseProxyWithTracing(u)
@@ -128,7 +128,7 @@ func MustProxyWithFallback(primaryURL, fallbackURL string) http.Handler {
 	primary, err := url.Parse(primaryURL)
 	if err != nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "bad report-service URL", constx.StatusInternalServerError)
+			WriteJSON(w, constx.StatusInternalServerError, nil)
 		})
 	}
 	primaryProxy := httputil.NewSingleHostReverseProxy(primary)
@@ -158,7 +158,7 @@ func MustProxyWithFallback(primaryURL, fallbackURL string) http.Handler {
 			fallbackProxy.ServeHTTP(w, r)
 			return
 		}
-		http.Error(w, "report upstream unavailable", constx.StatusBadGateway)
+		WriteJSON(w, constx.StatusBadGateway, nil)
 	}
 	return primaryProxy
 }

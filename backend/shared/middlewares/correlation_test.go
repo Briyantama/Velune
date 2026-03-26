@@ -29,6 +29,9 @@ func TestCorrelationIDHeader_generatesWhenAbsent(t *testing.T) {
 	if rec.Header().Get("X-Request-ID") == "" {
 		t.Fatal("expected X-Request-ID")
 	}
+	if got := rec.Header().Get("X-Request-Path"); got != "/" {
+		t.Fatalf("response header X-Request-Path %q", got)
+	}
 }
 
 func TestCorrelationIDHeader_preservesInbound(t *testing.T) {
@@ -48,5 +51,8 @@ func TestCorrelationIDHeader_preservesInbound(t *testing.T) {
 	}
 	if rec.Header().Get("X-Request-ID") != "fixed-rid" {
 		t.Fatal()
+	}
+	if got := rec.Header().Get("X-Request-Path"); got != "/" {
+		t.Fatalf("response header X-Request-Path %q", got)
 	}
 }

@@ -24,11 +24,12 @@ import (
 	sharedconfig "github.com/moon-eye/velune/shared/config"
 	"github.com/moon-eye/velune/shared/contracts"
 	"github.com/moon-eye/velune/shared/events"
-	"github.com/moon-eye/velune/shared/helper"
 	sharedlog "github.com/moon-eye/velune/shared/logger"
 	"github.com/moon-eye/velune/shared/metrics"
 	"github.com/moon-eye/velune/shared/middlewares"
 	"github.com/moon-eye/velune/shared/otelx"
+	"github.com/moon-eye/velune/shared/constx"
+	"github.com/moon-eye/velune/shared/httpx"
 	"github.com/moon-eye/velune/shared/sim"
 	stringx "github.com/moon-eye/velune/shared/stringx"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -284,8 +285,7 @@ func main() {
 
 func health() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = helper.EncodeJSON(w, map[string]any{
+		httpx.WriteJSON(w, constx.StatusOK, map[string]string{
 			"status":  "ok",
 			"service": "auth-service",
 		})
